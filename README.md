@@ -61,5 +61,6 @@ npx cap open android   # open in Android Studio
 ## CI and releases
 `.github/workflows/ci.yml` runs the unit and end-to-end tests, then builds the APK and uploads it
 as the `neo-bloxorz-apk` artifact. To release, bump `version` in `package.json` (the Android
-versionName/versionCode follow it), update `RELEASE_NOTES.md`, and push a matching tag
-(`v1.0.0`): the APK is attached to a GitHub release.
+versionName/versionCode follow it), update `RELEASE_NOTES.md`, then either push a matching tag
+(`v1.0.0`) or run the CI workflow manually from the Actions tab with **release** ticked. The APK is
+attached to the GitHub release.
