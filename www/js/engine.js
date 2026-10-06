@@ -20,7 +20,10 @@
   };
 
   function boundsOf(cells, what, name) {
-    if (!cells.length) throw new Error(`Level "${name}" has no ${what} cells`);
+    if (!cells.length) {
+      if (what === 'goal') return null;
+      throw new Error(`Level "${name}" has no ${what} cells`);
+    }
     const xs = cells.map((c) => c[0]);
     const ys = cells.map((c) => c[1]);
     const x = Math.min(...xs);
@@ -124,7 +127,7 @@
     }
 
     const g = level.goal;
-    if (n.x === g.x && n.y === g.y && n.w === g.w && n.h === g.h) {
+    if (g && n.x === g.x && n.y === g.y && n.w === g.w && n.h === g.h) {
       return { state: n, outcome: 'win', toggled: false, broke: [] };
     }
 
@@ -144,8 +147,8 @@
   }
 
   // Breadth-first search for the shortest solution. Returns an array of directions or null.
-  function solve(level) {
-    const start = initialState(level);
+  function solve(level, from) {
+    const start = from || initialState(level);
     const seen = new Map([[stateKey(start), null]]);
     let frontier = [start];
     while (frontier.length) {
@@ -170,7 +173,33 @@
     return null;
   }
 
-  const api = { DIRS, slotSize, expandSlots, parseLevel, initialState, tileAt, cellsOf, isBig, move, solve, stateKey };
+  // Breadth-first exploration of every reachable state (ignoring the goal).
+  // Returns Map(stateKey -> { state, dist }).
+  function explore(level) {
+    const free = { ...level, goal: null };
+    const start = initialState(level);
+    const seen = new Map([[stateKey(start), { state: start, dist: 0 }]]);
+    let frontier = [start];
+    let dist = 0;
+    while (frontier.length) {
+      dist++;
+      const next = [];
+      for (const s of frontier) {
+        for (const dir of Object.keys(DIRS)) {
+          const r = move(free, s, dir);
+          if (r.outcome === 'fall') continue;
+          const key = stateKey(r.state);
+          if (seen.has(key)) continue;
+          seen.set(key, { state: r.state, dist });
+          next.push(r.state);
+        }
+      }
+      frontier = next;
+    }
+    return seen;
+  }
+
+  const api = { explore, DIRS, slotSize, expandSlots, parseLevel, initialState, tileAt, cellsOf, isBig, move, solve, stateKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Engine = api;
-})(this);
+})(typeof window !== "undefined" ? window : globalThis);

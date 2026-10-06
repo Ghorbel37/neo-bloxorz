@@ -5,15 +5,78 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0b0d1a">
   <title>Neo Bloxorz</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main id="menu" class="screen">
+  <!-- Home -->
+  <main id="home" class="screen">
     <header class="title">
+      <div class="logo" aria-hidden="true">
+        <span class="b0"></span><span class="b1"></span><span class="b2"></span><span class="b3"></span>
+      </div>
       <h1>NEO<span>BLOXORZ</span></h1>
       <p>Roll. Morph. Fit.</p>
     </header>
-    <section class="howto" aria-label="How to play">
+    <nav class="modes" id="modes"></nav>
+    <footer class="home-foot">
+      <button id="btn-howto">How to play</button>
+      <button id="btn-settings">Settings</button>
+    </footer>
+  </main>
+
+  <!-- Level select -->
+  <main id="levels-screen" class="screen" hidden>
+    <header class="hud">
+      <button class="icon" data-action="home" aria-label="Back">‹</button>
+      <div class="hud-title"><div id="levels-title"></div><div id="levels-sub" class="stats"></div></div>
+      <span class="icon-spacer"></span>
+    </header>
+    <div id="levels" class="levels"></div>
+  </main>
+
+  <!-- Game -->
+  <main id="game" class="screen" hidden>
+    <header class="hud">
+      <button id="btn-quit" class="icon" aria-label="Quit">‹</button>
+      <div class="hud-title">
+        <div id="level-name"></div>
+        <div id="level-stats" class="stats"></div>
+      </div>
+      <button id="btn-restart" class="icon" aria-label="Restart">↺</button>
+    </header>
+    <div id="chips" class="chips"></div>
+    <div id="board-wrap" class="board-wrap">
+      <canvas id="board"></canvas>
+      <div id="toast" class="toast" hidden></div>
+    </div>
+    <p id="hint" class="hint"></p>
+    <footer class="pad">
+      <div class="tools">
+        <button id="btn-undo">Undo</button>
+        <button id="btn-hint">Hint</button>
+        <button id="btn-skip" hidden>Warp</button>
+      </div>
+      <div class="dpad" id="dpad">
+        <button data-dir="up" aria-label="Up">▲</button>
+        <button data-dir="left" aria-label="Left">◀</button>
+        <button data-dir="down" aria-label="Down">▼</button>
+        <button data-dir="right" aria-label="Right">▶</button>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Generic modal -->
+  <div id="modal" class="overlay" hidden>
+    <div class="card" role="dialog" aria-modal="true">
+      <h2 id="modal-title"></h2>
+      <div id="modal-body"></div>
+      <div id="modal-buttons" class="row"></div>
+    </div>
+  </div>
+
+  <template id="howto-template">
+    <div class="howto">
       <svg viewBox="0 0 120 120" aria-hidden="true">
         <rect class="slot" x="6" y="6" width="108" height="108" rx="6"/>
         <rect class="b2" x="14" y="14" width="22" height="44" rx="4"/>
@@ -23,51 +86,24 @@
         <path class="arrow" d="M40 95h16m-5-5 5 5-5 5M25 80V64m-5 5 5-5 5 5"/>
       </svg>
       <ul>
-        <li>Swipe <b>← →</b> to roll sideways: the block toggles its <b>width</b>.</li>
-        <li>Swipe <b>↑ ↓</b> to roll up or down: it toggles its <b>height</b>.</li>
+        <li>Swipe <b>← →</b>: the block rolls sideways and toggles its <b>width</b>.</li>
+        <li>Swipe <b>↑ ↓</b>: it rolls and toggles its <b>height</b>.</li>
         <li>Land exactly in the glowing goal. Don't fall off!</li>
       </ul>
-    </section>
-    <div id="levels" class="levels"></div>
-  </main>
-
-  <main id="game" class="screen" hidden>
-    <header class="hud">
-      <button id="btn-menu" class="icon" aria-label="Levels">☰</button>
-      <div class="hud-title">
-        <div id="level-name"></div>
-        <div id="level-stats" class="stats"></div>
-      </div>
-      <button id="btn-restart" class="icon" aria-label="Restart">↺</button>
-    </header>
-    <div id="board-wrap" class="board-wrap">
-      <canvas id="board"></canvas>
     </div>
-    <p id="hint" class="hint"></p>
-    <footer class="pad">
-      <button id="btn-undo" class="wide">Undo</button>
-      <div class="dpad">
-        <button data-dir="up" aria-label="Up">▲</button>
-        <button data-dir="left" aria-label="Left">◀</button>
-        <button data-dir="down" aria-label="Down">▼</button>
-        <button data-dir="right" aria-label="Right">▶</button>
-      </div>
-    </footer>
-    <div id="win" class="overlay" hidden>
-      <div class="card">
-        <h2>Solved!</h2>
-        <div id="win-stars" class="stars"></div>
-        <p id="win-text"></p>
-        <div class="row">
-          <button id="btn-replay">Replay</button>
-          <button id="btn-next" class="primary">Next</button>
-        </div>
-      </div>
-    </div>
-  </main>
+    <ul class="legend">
+      <li><i class="t-glass"></i><span><b>Glass</b> breaks under the big square.</span></li>
+      <li><i class="t-switch"></i><span><b>Switch</b> flips every bridge each time you land on it.</span></li>
+      <li><i class="t-heavy"></i><span><b>Heavy switch</b> only clicks under the big square.</span></li>
+      <li><i class="t-bridge"></i><span><b>Bridges</b> appear and vanish with switches.</span></li>
+    </ul>
+  </template>
 
   <script src="js/engine.js"></script>
   <script src="js/levels.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/modes.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
