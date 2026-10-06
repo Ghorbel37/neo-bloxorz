@@ -1,0 +1,21 @@
+{
+  "name": "neo-bloxorz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A 2D shape-shifting block puzzle for mobile.",
+  "scripts": {
+    "check-levels": "node tools/check-levels.js",
+    "serve": "npx --yes http-server www -c-1",
+    "sync": "cap sync android",
+    "android": "cap open android"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.5.2"
+  }
+}
