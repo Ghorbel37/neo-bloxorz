@@ -12,6 +12,7 @@
 (function (root) {
   const LEVELS = [
     {
+      world: 1,
       name: 'The Sketch',
       hint: 'Swipe → ← to change width, ↑ ↓ to change height. Reach the goal.',
       map: [
@@ -22,6 +23,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Long Way Round',
       hint: 'Fall off the edge and you start again.',
       map: [
@@ -33,6 +35,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Zigzag',
       map: [
         '..###G',
@@ -45,6 +48,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Thin Ice',
       hint: 'Glass ! cracks under the big square. The other shapes are light enough.',
       map: [
@@ -56,6 +60,7 @@
       ],
     },
     {
+      world: 1,
       name: 'The Bridge',
       hint: 'Land on a switch o to open the bridges =.',
       map: [
@@ -67,6 +72,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Heavy',
       hint: 'A heavy switch O only clicks under the big square.',
       map: [
@@ -80,6 +86,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Back and Forth',
       hint: 'Switches flip every bridge, every time you land on them: = opens, + closes.',
       map: [
@@ -91,6 +98,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Spiral',
       map: [
         '#########',
@@ -105,6 +113,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Glass Garden',
       map: [
         '!!!!!!G',
@@ -117,6 +126,7 @@
       ],
     },
     {
+      world: 1,
       name: 'Lock Step',
       map: [
         '#o#####',
@@ -128,8 +138,322 @@
         'S##o###',
       ],
     },
+  // World 2 and 3 were found with tools/make-campaign.js and then frozen here.
+    {
+      world: 2,
+      name: 'Frost',
+      hint: 'Glass ! holds every shape but the big square. Plan around it.',
+      map: [
+        '#!#G#',
+        '##..#',
+        '##!!!',
+        '#.#..',
+        '#####',
+        '...!#',
+        'S!###',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Hairline',
+      map: [
+        '!#!!G',
+        '#..!.',
+        '!!###',
+        '....#',
+        '##!##',
+        '###.!',
+        'S####',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Cold Feet',
+      map: [
+        '#####',
+        '#.#!#',
+        'G!!.!',
+        '....#',
+        '#!##!',
+        '##!.!',
+        'S###!',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Shards',
+      map: [
+        '!#!#!',
+        '!!!.!',
+        '###.#',
+        '!.!.#',
+        '###.G',
+        '#!#..',
+        '!###!',
+        '...!#',
+        'S###!',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Crackle',
+      map: [
+        '####!',
+        '#.#!#',
+        '##!.#',
+        '#.#!#',
+        'G!#.#',
+        '...##',
+        '##!##',
+        '#.!.#',
+        'S###!',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Frozen Lake',
+      map: [
+        '!####!#',
+        '#.....#',
+        '!.###!#',
+        '#!!.#.#',
+        'G.#.###',
+        '.!#.#.!',
+        '##!.###',
+        '##..#.!',
+        'S######',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Splinter',
+      map: [
+        'G.#!!!!',
+        '#.!##.#',
+        '#.##!#!',
+        '!.#..!!',
+        '##!.###',
+        '...#!.#',
+        '#!!##.#',
+        '#!#...#',
+        '#.####!',
+        '#.#.#.#',
+        'S.!####',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Mirror Maze',
+      map: [
+        '!!##!!#',
+        '!..#.!#',
+        '!##.###',
+        '#.!.#!!',
+        '#.#.###',
+        '#!!.!.#',
+        '#G!.##!',
+        '....#..',
+        '#!#.##!',
+        '#.!.#.#',
+        'S######',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Hall of Glass',
+      map: [
+        '##!##!#',
+        '#.#.#.!',
+        '!.#!!G!',
+        '!......',
+        '!.####!',
+        '###.!!#',
+        '#####!#',
+        '#.#.###',
+        '##!.#!#',
+        '.....!!',
+        'S###!##',
+      ],
+    },
+    {
+      world: 2,
+      name: 'Shatterpoint',
+      map: [
+        '###!#!!',
+        '#...!#G',
+        '!!###!#',
+        '#..#...',
+        '#!#.!#!',
+        '#.#.#!#',
+        '#.#!!.#',
+        '!.!!..#',
+        '!##.!##',
+        '!##.#.#',
+        '##!.###',
+        '....#.!',
+        'S######',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Circuit',
+      hint: 'Watch the bridges: every switch flips them all.',
+      map: [
+        'G=###',
+        '##..#',
+        '#####',
+        '##..#',
+        '#####',
+        '....#',
+        'So###',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Live Wire',
+      map: [
+        '#####',
+        '#..##',
+        '###.G',
+        '#.##.',
+        '#oo##',
+        '..#.#',
+        'S+###',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Relay',
+      map: [
+        '#####',
+        'o.##+',
+        '#.###',
+        '##..#',
+        '#.###',
+        '#.#.#',
+        'S.G##',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Flip Flop',
+      map: [
+        '#+###',
+        '#...#',
+        'G.##o',
+        '.####',
+        '#####',
+        '#...#',
+        '#####',
+        '..###',
+        'S####',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Fuse Box',
+      map: [
+        '####oo#',
+        '###...#',
+        '#####.#',
+        '#...=.#',
+        '#.###.#',
+        '+.#..##',
+        '#.#####',
+        '##..#.#',
+        'S.G####',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Short Circuit',
+      map: [
+        '###.##G',
+        '###.##.',
+        '#+!.##!',
+        '!##...!',
+        '###.o##',
+        '#.#.#..',
+        '#.o.##!',
+        '#.#.=.#',
+        'S.#####',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Heavyweight',
+      hint: 'Heavy switches O need the big square.',
+      map: [
+        '!####!#',
+        '#.#O#..',
+        '###.##o',
+        '##....+',
+        '#.#!###',
+        '!.#!!.+',
+        'G.###.#',
+        '..#.#!#',
+        '##!.#.#',
+        '!.#.#.#',
+        'S###!.#',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Overload',
+      map: [
+        '####!#G',
+        '+.#...=',
+        '####!##',
+        '!..##.!',
+        '##!##.#',
+        '....o..',
+        '###.###',
+        '#O#..##',
+        '!.##!.#',
+        '!.###.#',
+        'S.!####',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Power Grid',
+      map: [
+        '#.#!#!#',
+        '#.#...#',
+        '##o.#=!',
+        '#..!#.!',
+        '##!##.#',
+        '#!=..O#',
+        '##!.###',
+        '..#.!##',
+        '###.#=#',
+        '#...#.#',
+        'S.G##!#',
+      ],
+    },
+    {
+      world: 3,
+      name: 'Blackout',
+      map: [
+        '#!#!###',
+        '#.##.##',
+        '####o##',
+        '..#.=.!',
+        '#####.#',
+        '=.....#',
+        '#.!####',
+        '#.#....',
+        '!.#####',
+        '##..!##',
+        '!##.###',
+        '#O!...+',
+        'S#!.G##',
+      ],
+    },
   ];
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = LEVELS;
-  else root.LEVELS = LEVELS;
-})(this);
+  const WORLDS = ['Basics', 'Glass', 'Circuits'];
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign(LEVELS, { WORLDS });
+  else { root.LEVELS = LEVELS; root.WORLDS = WORLDS; }
+})(typeof window !== "undefined" ? window : globalThis);
