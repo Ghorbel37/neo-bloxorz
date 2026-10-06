@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0d1a">
+  <title>Neo Bloxorz</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="menu" class="screen">
+    <header class="title">
+      <h1>NEO<span>BLOXORZ</span></h1>
+      <p>Roll. Morph. Fit.</p>
+    </header>
+    <section class="howto" aria-label="How to play">
+      <svg viewBox="0 0 120 120" aria-hidden="true">
+        <rect class="slot" x="6" y="6" width="108" height="108" rx="6"/>
+        <rect class="b2" x="14" y="14" width="22" height="44" rx="4"/>
+        <rect class="b3" x="62" y="14" width="44" height="44" rx="4"/>
+        <rect class="b0" x="14" y="84" width="22" height="22" rx="4"/>
+        <rect class="b1" x="62" y="84" width="44" height="22" rx="4"/>
+        <path class="arrow" d="M40 95h16m-5-5 5 5-5 5M25 80V64m-5 5 5-5 5 5"/>
+      </svg>
+      <ul>
+        <li>Swipe <b>← →</b> to roll sideways: the block toggles its <b>width</b>.</li>
+        <li>Swipe <b>↑ ↓</b> to roll up or down: it toggles its <b>height</b>.</li>
+        <li>Land exactly in the glowing goal. Don't fall off!</li>
+      </ul>
+    </section>
+    <div id="levels" class="levels"></div>
+  </main>
+
+  <main id="game" class="screen" hidden>
+    <header class="hud">
+      <button id="btn-menu" class="icon" aria-label="Levels">☰</button>
+      <div class="hud-title">
+        <div id="level-name"></div>
+        <div id="level-stats" class="stats"></div>
+      </div>
+      <button id="btn-restart" class="icon" aria-label="Restart">↺</button>
+    </header>
+    <div id="board-wrap" class="board-wrap">
+      <canvas id="board"></canvas>
+    </div>
+    <p id="hint" class="hint"></p>
+    <footer class="pad">
+      <button id="btn-undo" class="wide">Undo</button>
+      <div class="dpad">
+        <button data-dir="up" aria-label="Up">▲</button>
+        <button data-dir="left" aria-label="Left">◀</button>
+        <button data-dir="down" aria-label="Down">▼</button>
+        <button data-dir="right" aria-label="Right">▶</button>
+      </div>
+    </footer>
+    <div id="win" class="overlay" hidden>
+      <div class="card">
+        <h2>Solved!</h2>
+        <div id="win-stars" class="stars"></div>
+        <p id="win-text"></p>
+        <div class="row">
+          <button id="btn-replay">Replay</button>
+          <button id="btn-next" class="primary">Next</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/engine.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
