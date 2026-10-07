@@ -11,10 +11,23 @@ The block starts as a **small square** in the bottom-left corner:
 | vertical bar 1×2 | big square | small square |
 | big square 2×2 | vertical bar | horizontal bar |
 
-Land exactly in the glowing goal (its outline shows the shape it needs). Don't fall off the board.
+**Rolling.** The block tips over its own edge, so rolling keeps a fixed rhythm
+(thin, thick, thin…): on open floor a spot can only be reached in one shape.
+
+**Bumping.** Rolling into a wall `X` makes the block change shape in place, pressed against
+the wall. That shifts its rhythm. Land exactly in the glowing goal, in the shape its outline
+shows: working out which walls to bump, and in what order, is the puzzle.
+
+### Tiles
+- **Wall** `X` blocks rolling; bump it to change shape in place.
+- **Glass** `!` breaks under the big square.
+- **Shape tiles** `a` `b` `c` `d` only hold the small square, horizontal bar, vertical bar or big square.
+- **Switch** `o` flips every bridge each time the block lands on it.
+- **Heavy switch** `O` only clicks under the big square.
+- **Bridges**: `=` starts closed, `+` starts open.
 
 ## Modes
-- **Campaign**: 30 puzzles in 3 worlds (Basics, Glass, Circuits), with stars and hints.
+- **Campaign**: 32 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
 - **Descent**: a roguelike run through endless generated floors. 3 hearts, a move budget per floor,
   and a perk to pick after each floor (Extra Heart, Rewind, Stamina, Ghost, Compass, Warp).
 - **Rush**: time attack. 90 seconds, each solve buys more time, puzzles get harder.
@@ -32,19 +45,21 @@ thick, and each slot only fits one shape.
 
 ## Controls
 Swipe on the board, use the on-screen pad, or press the arrow keys/WASD. `U` undoes, `R` restarts, `H` shows a hint.
+Dashed outlines show where each swipe would land (can be turned off in Settings).
 
 ## Project layout
 - `www/` — the game (plain HTML/CSS/JS, no build step)
   - `js/engine.js` — rules and a breadth-first solver (shared with node)
   - `js/levels.js` — campaign level maps (see the legend at the top of the file)
-  - `js/generator.js` — seeded procedural levels for Descent, Rush and Daily
+  - `js/generator.js` — seeded procedural puzzles for Descent, Rush and Daily; a level is only
+    kept if it needs wall bumps (`Engine.minBumps`), so it can't be solved by following a path
   - `js/modes.js` — mode rules (hearts, perks, budgets, timers, streaks)
   - `js/audio.js` — synthesized sound effects
   - `js/game.js` — rendering, input, menus, saved progress
 - `android/` — Capacitor Android project
 - `test/` — unit tests (`npm test`) and Playwright end-to-end tests (`npm run test:e2e`)
 - `tools/check-levels.js` — prints every campaign level's par and solution
-- `tools/make-campaign.js` — searches generator seeds for new campaign levels
+- `tools/make-campaign.js` — searches generator seeds for campaign levels (where each world's mechanic matters)
 - `tools/make-icons.js` — renders `www/icon.svg` into the Android icons and splash screens
 
 ## Develop

@@ -43,6 +43,8 @@
     win() { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => tone(f, i * 0.08, 0.22, { type: 'triangle', volume: 0.1 })); },
     lose() { tone(220, 0, 0.25, { type: 'square', volume: 0.06 }); tone(165, 0.22, 0.4, { type: 'square', volume: 0.06 }); },
     perk() { [659.25, 987.77].forEach((f, i) => tone(f, i * 0.07, 0.18, { type: 'sine', volume: 0.1 })); },
+    bump() { tone(180, 0, 0.08, { type: 'square', volume: 0.08 }); tone(330, 0.03, 0.08, { type: 'triangle', volume: 0.06 }); },
+    blocked() { tone(110, 0, 0.1, { type: 'square', volume: 0.06 }); },
     tick() { tone(1200, 0, 0.03, { type: 'square', volume: 0.03 }); },
     tap() { tone(660, 0, 0.04, { type: 'sine', volume: 0.05 }); },
   };
