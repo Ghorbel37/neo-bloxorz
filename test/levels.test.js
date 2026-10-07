@@ -3,8 +3,8 @@ const assert = require('node:assert/strict');
 const Engine = require('../www/js/engine.js');
 const LEVELS = require('../www/js/levels.js');
 
-test('campaign has 32 levels in 4 worlds', () => {
-  assert.equal(LEVELS.length, 32);
+test('campaign has 36 levels in 4 worlds', () => {
+  assert.equal(LEVELS.length, 36);
   assert.deepEqual([...new Set(LEVELS.map((l) => l.world))], [1, 2, 3, 4]);
   assert.equal(LEVELS.WORLDS.length, 4);
   assert.equal(new Set(LEVELS.map((l) => l.name)).size, LEVELS.length, 'names are unique');

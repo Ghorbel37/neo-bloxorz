@@ -27,7 +27,9 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 - **Bridges**: `=` starts closed, `+` starts open.
 
 ## Modes
-- **Campaign**: 32 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
+- **Campaign**: 36 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
+  Every mechanic is introduced by a short coached tutorial level (guided swipes, highlighted
+  tiles) right before it is needed; the game opens straight into the first one.
 - **Descent**: a roguelike run through endless generated floors. 3 hearts, a move budget per floor,
   and a perk to pick after each floor (Extra Heart, Rewind, Stamina, Ghost, Compass, Warp).
 - **Rush**: time attack. 90 seconds, each solve buys more time, puzzles get harder.
@@ -51,15 +53,20 @@ Dashed outlines show where each swipe would land (can be turned off in Settings)
 - `www/` — the game (plain HTML/CSS/JS, no build step)
   - `js/engine.js` — rules and a breadth-first solver (shared with node)
   - `js/levels.js` — campaign level maps (see the legend at the top of the file)
-  - `js/generator.js` — seeded procedural puzzles for Descent, Rush and Daily; a level is only
-    kept if it needs wall bumps (`Engine.minBumps`), so it can't be solved by following a path
+  - `js/generator.js` — seeded procedural puzzles for Descent, Rush and Daily. The goal is
+    placed on a position the solver reached, every level is re-solved on its final map, and a
+    level is only kept if it needs wall bumps (`Engine.minBumps`). `generateSafe` retries with
+    easier settings and ends with a fixed puzzle, so a mode always gets a solvable level.
   - `js/modes.js` — mode rules (hearts, perks, budgets, timers, streaks)
   - `js/audio.js` — synthesized sound effects
   - `js/game.js` — rendering, input, menus, saved progress
 - `android/` — Capacitor Android project
-- `test/` — unit tests (`npm test`) and Playwright end-to-end tests (`npm run test:e2e`)
+- `test/` — unit tests (`npm test`) and Playwright end-to-end tests (`npm run test:e2e`).
+  `generated-solvable.test.js` checks ~3,000 generated levels across every mode (all depths
+  1–40, Descent runs, Rush sessions and every Daily of a year) with the solver.
 - `tools/check-levels.js` — prints every campaign level's par and solution
 - `tools/make-campaign.js` — searches generator seeds for campaign levels (where each world's mechanic matters)
+- `tools/make-tutorials.js` — searches for the small boards used by the tutorial levels
 - `tools/make-icons.js` — renders `www/icon.svg` into the Android icons and splash screens
 
 ## Develop

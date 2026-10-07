@@ -3,13 +3,23 @@
 //   a b c d  shape tiles (small / horizontal / vertical / big only)
 //   o switch   O heavy switch (big square only)   = bridge (closed)   + bridge (open)
 // The S cells give the starting shape, the G cells the shape needed to finish.
-// After the two tutorials, levels were found with tools/make-campaign.js and frozen here.
+// Levels with a `tutorial` introduce a mechanic with coached steps (boards found with
+// tools/make-tutorials.js); the others were found with tools/make-campaign.js and frozen here.
+// Tutorial steps: { say, dir?, mark? }. A step with `dir` waits for that swipe; one without
+// lets the player finish the level. `mark` highlights tiles: a list of [x, y] or one of
+// 'goal', 'glass', 'shapes', 'switches', 'bridges'.
 (function (root) {
   const LEVELS = [
     {
       world: 1,
       name: 'The Sketch',
-      hint: 'Swipe → ← to roll sideways (width changes), ↑ ↓ to roll up or down (height changes). Reach the goal as the big square.',
+      tutorial: [
+        { dir: 'right', say: 'Swipe right → to roll. The small square tips over and becomes a horizontal bar.' },
+        { dir: 'right', say: 'Swipe → again: the bar rolls over and becomes a small square.' },
+        { dir: 'right', say: 'Every move changes the shape. Swipe → once more.' },
+        { dir: 'up', say: 'Up and down change the height. Swipe ↑: the bar becomes the big square.' },
+        { say: 'Keep going up and land exactly in the glowing goal, in its shape.', mark: 'goal' },
+      ],
       map: [
         '####GG',
         '####GG',
@@ -22,20 +32,25 @@
     {
       world: 1,
       name: 'Bump',
-      hint: 'Rolling into a wall (the raised block) makes the block change shape in place. Bump it to stop on the goal.',
+      tutorial: [
+        { dir: 'right', say: 'Raised blocks are walls. Swipe → to roll toward this one.', mark: [[3, 0]] },
+        { dir: 'right', say: 'The bar can\'t roll into the wall, so it bumps it and changes shape in place. Swipe → to bump!', mark: [[3, 0]] },
+      ],
       map: [
         'S#GX',
       ],
     },
     {
       world: 1,
-      name: 'Wrong Foot',
-      hint: 'Walls let you change shape without moving forward. Use them to get in step with the goal.',
+      name: 'Out of Step',
+      tutorial: [
+        { dir: 'right', say: 'The goal is right next to you. Try rolling onto it: swipe →.', mark: 'goal' },
+        { say: 'Rolled past it! Rolling keeps a rhythm, so you skip that spot. Bump the wall to get in step. Dashed outlines show where each swipe lands.', mark: [[0, 1]] },
+      ],
       map: [
-        'X###',
-        'X###',
-        '.###',
-        'SG##',
+        '###',
+        'X##',
+        'SG#',
       ],
     },
     {
@@ -99,8 +114,20 @@
     },
     {
       world: 2,
+      name: 'Glass',
+      tutorial: [
+        { say: 'Glass holds the small square and the bars, but the big square is too heavy: it breaks through. Find a way around.', mark: 'glass' },
+      ],
+      map: [
+        'X###',
+        '#!GG',
+        '##GG',
+        'S###',
+      ],
+    },
+    {
+      world: 2,
       name: 'Thin Ice',
-      hint: 'Glass holds every shape except the big square.',
       map: [
         '.X...',
         '#!#..',
@@ -190,8 +217,19 @@
     },
     {
       world: 3,
+      name: 'Shape Tiles',
+      tutorial: [
+        { say: 'Colored tiles only hold the shape drawn on them. This pink one is for the big square only.', mark: 'shapes' },
+      ],
+      map: [
+        '#G###',
+        '#G###',
+        'Sd##X',
+      ],
+    },
+    {
+      world: 3,
       name: 'Fitting In',
-      hint: 'Colored tiles only hold the matching shape: teal small, amber horizontal, blue vertical, pink big.',
       map: [
         '...X.',
         'X..#.',
@@ -287,8 +325,20 @@
     },
     {
       world: 4,
+      name: 'Switch',
+      tutorial: [
+        { dir: 'up', say: 'Dashed tiles are bridges, closed for now. Swipe ↑ onto the switch.', mark: 'switches' },
+        { say: 'The bridge appeared! Each time you land on a switch, every bridge flips: open ones close, closed ones open.', mark: 'bridges' },
+      ],
+      map: [
+        'o#=#',
+        '#GG#',
+        'SX##',
+      ],
+    },
+    {
+      world: 4,
       name: 'Circuit',
-      hint: 'Land on a switch to flip every bridge: hidden ones appear, solid ones vanish.',
       map: [
         'X...X.',
         '#..X#!',
@@ -339,8 +389,20 @@
     },
     {
       world: 4,
+      name: 'Heavy Switch',
+      tutorial: [
+        { say: 'A heavy switch (thick ring) only clicks under the big square. Open the bridge to reach the goal.', mark: 'switches' },
+      ],
+      map: [
+        'X=GG',
+        '####',
+        '.O##',
+        'S###',
+      ],
+    },
+    {
+      world: 4,
       name: 'Heavyweight',
-      hint: 'A heavy switch (thick ring) only clicks under the big square.',
       map: [
         '#+#X.',
         '#O##X',
