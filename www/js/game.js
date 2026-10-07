@@ -7,12 +7,17 @@
 
   // ---------- Storage ----------
   const STORE_KEY = 'neo-bloxorz-v1';
-  const STORE_VERSION = 2;
+  const STORE_VERSION = 3;
+  // 1.1 (store version 2) saved campaign progress by level number, in this order.
+  const V2_LEVEL_NAMES = ['The Sketch', 'Bump', 'Wrong Foot', 'Sidestep', 'Off Beat', 'Backspin', 'Double Take', 'Rebound',
+    'Ricochet', 'Thin Ice', 'Hairline', 'Cold Feet', 'Shards', 'Crackle', 'Frozen Lake', 'Splinter', 'Hall of Glass',
+    'Fitting In', 'Square Peg', 'Shape Shift', 'Keyhole', 'Mold', 'Silhouette', 'Jigsaw', 'Morphology', 'Circuit',
+    'Live Wire', 'Relay', 'Flip Flop', 'Heavyweight', 'Overload', 'Blackout'];
   const DEFAULTS = {
     version: STORE_VERSION,
-    campaign: {}, // level index -> best moves
-    hinted: {}, // level index -> true if solved only with hints
-    precision: {}, // level index -> best moves within the limit
+    campaign: {}, // level name -> best moves
+    hinted: {}, // level name -> true if solved only with hints
+    precision: {}, // level name -> best moves within the limit
     runBest: 0,
     sparksBest: 0,
     run: null, // saved roguelike run
@@ -28,8 +33,16 @@
     const base = JSON.parse(JSON.stringify(DEFAULTS));
     if (!data || typeof data !== 'object') return base;
     const merged = { ...base, ...data, settings: { ...base.settings, ...(data.settings || {}) } };
-    if (data.version !== STORE_VERSION) {
-      // 1.1 replaced the campaign and the generator: old level progress and runs no longer apply.
+    if (data.version === 2) {
+      // 1.1 -> 1.2: progress was keyed by level number; key it by level name instead.
+      for (const key of ['campaign', 'hinted', 'precision']) {
+        const byName = {};
+        for (const [i, v] of Object.entries(merged[key] || {})) if (V2_LEVEL_NAMES[i]) byName[V2_LEVEL_NAMES[i]] = v;
+        merged[key] = byName;
+      }
+      merged.version = STORE_VERSION;
+    } else if (data.version !== STORE_VERSION) {
+      // 1.0: a different game (no walls). Its level progress and runs no longer apply.
       Object.assign(merged, { campaign: {}, hinted: {}, precision: {}, run: null, daily: {}, version: STORE_VERSION });
       merged.seenIntro = {};
     }
@@ -40,6 +53,8 @@
   }
 
   const campaign = LEVELS.map(parseLevel);
+  const lk = (i) => LEVELS[i].name; // progress is saved by level name
+  const cleared = (i) => store.campaign[lk(i)] != null;
   const campaignPars = campaign.map((l) => solve(l).length);
 
   // ---------- Screens ----------
@@ -100,17 +115,19 @@
 
   // ---------- Home ----------
   function totalStars() {
-    return Object.entries(store.campaign).reduce((n, [i, m]) => {
+    return LEVELS.reduce((n, _, i) => {
+      const m = store.campaign[lk(i)];
+      if (m == null) return n;
       const s = Modes.starsFor(m, campaignPars[i]);
-      return n + (store.hinted[i] ? Math.min(2, s) : s);
+      return n + (store.hinted[lk(i)] ? Math.min(2, s) : s);
     }, 0);
   }
 
   function showHome() {
     closeModal(true);
     session = null;
-    const done = Object.keys(store.campaign).length;
-    const sealed = Object.keys(store.precision).length;
+    const done = LEVELS.filter((_, i) => cleared(i)).length;
+    const sealed = LEVELS.filter((_, i) => store.precision[lk(i)] != null).length;
     const today = Modes.dateKey();
     const streak = Modes.dailyStreak(Object.keys(store.daily));
     const cards = [
@@ -177,7 +194,7 @@
     const precision = mode === 'precision';
     $('levels-title').textContent = precision ? 'Precision' : 'Campaign';
     $('levels-sub').textContent = precision
-      ? `${Object.keys(store.precision).length}/${LEVELS.length} sealed`
+      ? `${LEVELS.filter((_, i) => store.precision[lk(i)] != null).length}/${LEVELS.length} sealed`
       : `★ ${totalStars()} / ${LEVELS.length * 3}`;
     const wrap = $('levels');
     wrap.innerHTML = '';
@@ -190,18 +207,18 @@
       grid.className = 'world-grid';
       LEVELS.forEach((def, i) => {
         if (def.world !== w + 1) return;
-        const best = store.campaign[i];
-        const unlocked = precision ? best != null : i === 0 || store.campaign[i - 1] != null || best != null;
+        const best = store.campaign[lk(i)];
+        const unlocked = precision ? best != null : i === 0 || cleared(i - 1) || best != null;
         const b = document.createElement('button');
         b.disabled = !unlocked;
         let label = '';
         if (precision) {
-          if (store.precision[i] != null) { b.classList.add('sealed'); label = '◎'; }
+          if (store.precision[lk(i)] != null) { b.classList.add('sealed'); label = '◎'; }
           else label = `≤${Modes.precisionLimit(campaignPars[i])}`;
         } else if (best != null) {
           b.classList.add('done');
           const s = Modes.starsFor(best, campaignPars[i]);
-          label = '★'.repeat(store.hinted[i] ? Math.min(2, s) : s);
+          label = '★'.repeat(store.hinted[lk(i)] ? Math.min(2, s) : s);
         }
         b.innerHTML = `<span class="num">${i + 1}</span><span class="lvl-stars">${label}</span>`;
         b.setAttribute('aria-label', `Level ${i + 1}: ${def.name}`);
@@ -232,7 +249,7 @@
     const retry = () => startSession(campaignSession(i, precision));
     const next = () => {
       if (precision) {
-        const n = LEVELS.findIndex((_, k) => k > i && store.campaign[k] != null && store.precision[k] == null);
+        const n = LEVELS.findIndex((_, k) => k > i && cleared(k) && store.precision[lk(k)] == null);
         if (n >= 0) startSession(campaignSession(n, true));
         else openLevels('precision');
       } else if (i + 1 < LEVELS.length) startSession(campaignSession(i + 1, false));
@@ -242,6 +259,7 @@
       kind: precision ? 'precision' : 'campaign',
       title: `${i + 1}. ${LEVELS[i].name}`,
       hintText: precision ? `Solve in ${limit} moves or fewer.` : LEVELS[i].hint || '',
+      tutorial: precision ? null : LEVELS[i].tutorial || null,
       level: campaign[i],
       limit: precision ? () => limit : null,
       canUndo: () => !precision,
@@ -249,7 +267,7 @@
       useHint() { hinted = true; },
       stats() {
         if (precision) return `Moves ${play.moves}/${limit} · Par ${par}`;
-        const best = store.campaign[i];
+        const best = store.campaign[lk(i)];
         return `Moves ${play.moves} · Par ${par}` + (best != null ? ` · Best ${best}` : '');
       },
       chips: () => (precision ? [{ text: `${limit - play.moves} moves left`, warn: limit - play.moves <= 3 }] : []),
@@ -267,15 +285,15 @@
       onWin(moves) {
         let html;
         if (precision) {
-          const prev = store.precision[i];
-          if (prev == null || moves < prev) store.precision[i] = moves;
+          const prev = store.precision[lk(i)];
+          if (prev == null || moves < prev) store.precision[lk(i)] = moves;
           html = `<div class="big-number">◎</div>Sealed in <b>${moves}</b> moves (limit ${limit}, par ${par}).`;
         } else {
-          const prev = store.campaign[i];
+          const prev = store.campaign[lk(i)];
           const firstClear = prev == null;
-          if (firstClear || moves < prev) store.campaign[i] = moves;
-          if (!hinted) delete store.hinted[i];
-          else if (firstClear || store.hinted[i]) store.hinted[i] = true;
+          if (firstClear || moves < prev) store.campaign[lk(i)] = moves;
+          if (!hinted) delete store.hinted[lk(i)];
+          else if (firstClear || store.hinted[lk(i)]) store.hinted[lk(i)] = true;
           let stars = Modes.starsFor(moves, par);
           if (hinted) stars = Math.min(2, stars);
           html = `<div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
@@ -542,10 +560,56 @@
     Object.assign(play, {
       level, state: initialState(level), history: [], moves: 0, anim: null, queued: null,
       broken: new Set(), frozen: false, hint: null,
+      coach: session.tutorial ? { steps: session.tutorial, i: 0 } : null,
     });
     $('level-name').textContent = session.title;
+    renderCoach();
     resize();
     refreshHud();
+  }
+
+  // ---------- Tutorial coach ----------
+  // Tutorial steps are a run of guided swipes (`dir`) followed by free play. Guided steps
+  // only accept the expected swipe; marked tiles pulse on the board.
+  function coachStep() {
+    const c = play.coach;
+    return c && c.i < c.steps.length ? c.steps[c.i] : null;
+  }
+
+  function markedCells(mark) {
+    if (!mark) return [];
+    if (Array.isArray(mark)) return mark;
+    const level = play.level;
+    if (mark === 'goal') return level.goal ? Engine.cellsOf(level.goal) : [];
+    const chars = { glass: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
+    const out = [];
+    level.tiles.forEach((row, y) => row.forEach((t, x) => { if (chars.includes(t)) out.push([x, y]); }));
+    return out;
+  }
+
+  function renderCoach() {
+    const step = coachStep();
+    const box = $('coach');
+    document.querySelectorAll('.dpad button').forEach((b) => b.classList.toggle('coach-pulse', !!step && b.dataset.dir === step.dir));
+    if (!step) {
+      box.hidden = true;
+      $('hint').hidden = false;
+      play.marks = [];
+      return;
+    }
+    $('coach-text').textContent = step.say;
+    const dots = $('coach-dots');
+    dots.innerHTML = play.coach.steps.map((_, k) => `<span class="${k <= play.coach.i ? 'on' : ''}"></span>`).join('');
+    box.hidden = false;
+    $('hint').hidden = true;
+    play.marks = markedCells(step.mark);
+  }
+
+  function nudgeCoach() {
+    const box = $('coach');
+    box.classList.remove('nudge');
+    void box.offsetWidth;
+    box.classList.add('nudge');
   }
 
   function resetLevel() {
@@ -585,7 +649,8 @@
     const hint = $('btn-hint');
     hint.hidden = !session.canHint() && !session.hintLabel;
     hint.textContent = session.hintLabel ? session.hintLabel() : 'Hint';
-    hint.disabled = !session.canHint() || play.frozen;
+    const guided = coachStep() && coachStep().dir;
+    hint.disabled = !session.canHint() || play.frozen || !!guided;
     const skip = $('btn-skip');
     skip.hidden = !(session.canSkip && session.canSkip());
     $('dpad').hidden = !store.settings.dpad;
@@ -595,6 +660,12 @@
     if (!session || play.frozen || !play.level || modalOpen()) return;
     if (play.anim) { play.queued = dir; return; }
     Sound.unlock();
+    const step = coachStep();
+    if (step && step.dir && dir !== step.dir) {
+      nudgeCoach();
+      Sound.blocked();
+      return;
+    }
     const from = play.state;
     const r = move(play.level, from, dir);
     if (r.outcome === 'blocked') {
@@ -611,6 +682,10 @@
     play.history.push(from);
     play.moves++;
     play.hint = null;
+    if (step && step.dir && r.outcome !== 'fall') {
+      play.coach.i++;
+      renderCoach();
+    }
     if (r.outcome === 'fall') {
       play.frozen = true;
       r.broke.forEach(([x, y]) => play.broken.add(`${x},${y}`));
@@ -631,6 +706,9 @@
       play.state = r.state;
       Sound.move(shapeIndex(r.state.w, r.state.h));
       if (r.toggled) { Sound.toggle(); vibrate(15); }
+      // Levels always start solvable, but a move (like a switch flipped at the wrong
+      // time) can leave no way to the goal: say so instead of letting the player wander.
+      if (!solve(play.level, play.state)) toast('No way to the goal from here — undo or restart');
       if (session.limit && play.moves >= session.limit()) {
         play.frozen = true;
         animate(from, r.state, 'move', () => session.onOutOfMoves());
@@ -645,6 +723,10 @@
     if (!session || play.anim || play.frozen || !play.history.length || !session.canUndo()) return;
     if (session.useUndo) session.useUndo();
     rewind();
+    if (play.coach && play.coach.i > play.history.length) {
+      play.coach.i = play.history.length;
+      renderCoach();
+    }
     Sound.tap();
   }
 
@@ -788,6 +870,19 @@
       ctx.lineWidth = 2.5;
       ctx.stroke();
       ctx.shadowBlur = 0;
+    }
+  }
+
+  // Tiles highlighted by the tutorial coach pulse.
+  function drawMarks(now) {
+    if (!play.marks || !play.marks.length) return;
+    const pulse = 0.5 + 0.5 * Math.sin(now / 220);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.35 + 0.55 * pulse})`;
+    for (const [x, y] of play.marks) {
+      const inset = 2 + pulse;
+      roundRect(x * unit + inset, y * unit + inset, unit - inset * 2, unit - inset * 2, unit * 0.2);
+      ctx.stroke();
     }
   }
 
@@ -962,8 +1057,10 @@
       }
     }
     if (store.settings.preview && !play.anim && !play.frozen) drawPreview();
+    drawMarks(now);
     drawBlock(block, alpha, scale);
-    if (play.hint && !play.anim) drawHint(block, play.hint, now);
+    const guide = coachStep() && coachStep().dir;
+    if ((guide || play.hint) && !play.anim && !play.frozen) drawHint(block, guide || play.hint, now);
     drawParticles();
   }
   requestAnimationFrame(frame);
@@ -1076,11 +1173,12 @@
   Sound.setEnabled(store.settings.sound);
   showHome();
   if (!store.seenIntro.howto) {
+    // First launch: learn by playing, straight into the first tutorial level.
     store.seenIntro.howto = true;
     save();
-    openHowTo();
+    if (!cleared(0)) startSession(campaignSession(0, false));
   }
 
   // Exposed for automated tests.
-  window.__neo = { play, get session() { return session; }, store: () => store, tryMove, campaignPars };
+  window.__neo = { play, get session() { return session; }, store: () => store, tryMove, campaignPars, coachStep };
 })();

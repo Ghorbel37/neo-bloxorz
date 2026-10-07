@@ -59,8 +59,28 @@
       if (good) break;
     }
     if (best) { delete best.score; return best; }
-    // Very unlucky seed: fall back to easier settings rather than failing.
-    return generate(seed + 1, { ...opts, holes: opts.holes * 0.7, minPar: Math.max(4, opts.minPar - 6), minBumps: Math.max(1, opts.minBumps - 1) });
+    return null;
+  }
+
+  // Last resort if a seed produces nothing even with easier settings: a fixed puzzle that
+  // is checked by the tests. In practice this is never reached.
+  const FALLBACK_MAP = ['##X###', '######', '#X##X#', '######', 'SG##X#'];
+  function fallbackLevel() {
+    const level = Engine.parseLevel({ name: 'fallback', map: FALLBACK_MAP });
+    const solution = Engine.solve(level);
+    return { map: FALLBACK_MAP.slice(), par: solution.length, solution, bumps: Engine.minBumps(level), near: 1, fallback: true };
+  }
+
+  // Always returns a solvable level: tries the wanted settings, then up to three easier
+  // versions of them, then the fixed fallback puzzle.
+  function generateSafe(seed, opts) {
+    let o = opts;
+    for (let tries = 0; tries < 4; tries++) {
+      const l = generate(seed + tries * 7919, o);
+      if (l) return l;
+      o = { ...o, holes: o.holes * 0.6, minPar: Math.max(4, o.minPar - 6), minBumps: Math.max(1, o.minBumps - 1) };
+    }
+    return fallbackLevel();
   }
 
   function attemptGenerate(rng, o) {
@@ -109,8 +129,18 @@
     let cands = all.filter((c) => c.dist >= o.minPar && c.dist <= o.maxPar);
     if (!cands.length) cands = all.sort((a, b) => b.dist - a.dist).slice(0, 12);
 
-    // Tidy the board: tiles the block can never touch become void, except walls and traps
-    // next to reachable tiles (they shape the puzzle and show what to avoid).
+    // Tidy the board: tiles the block can never touch become void. That never changes the
+    // puzzle (any move onto them falls anyway), except for walls, which matter whenever a
+    // roll would hit them, even two tiles away. So walls that some reachable position can
+    // bump stay, and so do walls and traps next to reachable tiles (they show what to avoid).
+    const usedWalls = new Set();
+    for (const { state } of seen.values()) {
+      for (const dir of Object.keys(Engine.DIRS)) {
+        for (const [x, y] of Engine.cellsOf(Engine.roll(state, dir))) {
+          if (g[y] && g[y][x] === 'X') usedWalls.add(`${x},${y}`);
+        }
+      }
+    }
     const touched = (x, y) => visited.has(`${x},${y}`);
     const nearPath = (x, y) => [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => touched(x + dx, y + dy));
     let bridgeUsed = false;
@@ -118,6 +148,7 @@
       const t = g[y][x];
       if (t === '.') continue;
       if (touched(x, y)) { if (t === '=' || t === '+') bridgeUsed = true; continue; }
+      if (t === 'X' && usedWalls.has(`${x},${y}`)) continue;
       if ((t === 'X' || t === '!' || 'abcd'.includes(t)) && nearPath(x, y)) continue;
       g[y][x] = '.';
     }
@@ -151,10 +182,10 @@
   }
 
   function generateForDepth(depth, seed) {
-    return { ...generate(seed, settingsFor(depth)), depth };
+    return { ...generateSafe(seed, settingsFor(depth)), depth };
   }
 
-  const api = { mulberry32, hashString, settingsFor, generate, generateForDepth, trimMap };
+  const api = { mulberry32, hashString, settingsFor, generate, generateSafe, generateForDepth, fallbackLevel, trimMap };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.Generator = api;
 })(typeof window !== 'undefined' ? window : globalThis);

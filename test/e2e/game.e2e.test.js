@@ -4,8 +4,8 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const fs = require('node:fs');
 const { chromium } = require('playwright');
-const Engine = require('../../www/js/engine.js');
 const LEVELS = require('../../www/js/levels.js');
+const Engine = require('../../www/js/engine.js');
 
 const URL = 'file://' + path.resolve(__dirname, '../../www/index.html');
 const KEY = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' };
@@ -18,11 +18,21 @@ test.before(async () => {
 });
 test.after(async () => { if (browser) await browser.close(); });
 
-async function newPage() {
+// Pages start as a returning player (first-launch tutorial already seen) unless `fresh`.
+// `cleared` marks that many campaign levels as solved so later ones are unlocked.
+async function newPage({ fresh = false, cleared = 0 } = {}) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  if (!fresh) {
+    await page.addInitScript((names) => {
+      if (localStorage.getItem('neo-bloxorz-v1')) return;
+      const campaign = {};
+      for (const name of names) campaign[name] = 999;
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true }, campaign }));
+    }, LEVELS.slice(0, cleared).map((l) => l.name));
+  }
   await page.goto(URL);
   page.errors = errors;
   return page;
@@ -32,9 +42,19 @@ async function shot(page, name) {
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${name}.png`) });
 }
 
-async function playSolution(page, map) {
-  const level = Engine.parseLevel({ name: 'x', map });
-  for (const dir of Engine.solve(level)) {
+// Plays the current level to the end: the tutorial's guided swipe when there is one,
+// otherwise the solver's best move from wherever the block is.
+async function playSolution(page) {
+  for (let i = 0; i < 200; i++) {
+    const dir = await page.evaluate(() => {
+      const { play, coachStep } = window.__neo;
+      if (play.frozen) return null;
+      const step = coachStep();
+      if (step && step.dir) return step.dir;
+      const path = Engine.solve(play.level, play.state);
+      return path ? path[0] : null;
+    });
+    if (!dir) return;
     await page.keyboard.press(KEY[dir]);
     await page.waitForFunction(() => !window.__neo.play.anim);
   }
@@ -44,13 +64,50 @@ async function dismissIntro(page) {
   if (await page.isVisible('#modal')) await page.click('#modal-buttons .primary');
 }
 
-test('first launch shows how to play, then the home screen with 5 modes', async () => {
+test('first launch starts the coached tutorial', async () => {
+  const page = await newPage({ fresh: true });
+  assert.ok(await page.isVisible('#game'));
+  assert.ok(await page.isVisible('#coach'));
+  assert.match(await page.textContent('#coach-text'), /Swipe right/);
+  assert.ok(await page.locator('.dpad [data-dir=right]').evaluate((b) => b.classList.contains('coach-pulse')));
+  await shot(page, 'tutorial-1');
+  // A swipe other than the one asked for is ignored.
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.evaluate(() => window.__neo.play.moves), 0);
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => !window.__neo.play.anim);
+  assert.match(await page.textContent('#coach-text'), /again/);
+  // Undo takes the coach back a step too.
+  await page.click('#btn-undo');
+  assert.match(await page.textContent('#coach-text'), /Swipe right/);
+  assert.deepEqual(page.errors, []);
+});
+
+test('home screen lists 5 modes and how to play', async () => {
   const page = await newPage();
-  assert.ok(await page.isVisible('#modal'));
-  await shot(page, 'howto');
-  await dismissIntro(page);
   assert.equal(await page.locator('#modes .mode').count(), 5);
   await shot(page, 'home');
+  await page.click('#btn-howto');
+  assert.equal(await page.textContent('#modal-title'), 'How to play');
+  await shot(page, 'howto');
+  assert.deepEqual(page.errors, []);
+});
+
+test('tutorial levels coach each mechanic', async () => {
+  const page = await newPage({ cleared: LEVELS.length });
+  for (const name of ['Out of Step', 'Glass', 'Switch']) {
+    const i = LEVELS.findIndex((l) => l.name === name);
+    await page.evaluate(() => document.querySelector('[data-action=home]').click());
+    await page.click('#modes .mode >> nth=0');
+    await page.click(`.world-grid button[aria-label^="Level ${i + 1}:"]`);
+    assert.ok(await page.isVisible('#coach'), `${name} shows the coach`);
+    assert.ok((await page.evaluate(() => window.__neo.play.marks.length)) > 0, `${name} highlights tiles`);
+    await shot(page, `tutorial-${name.toLowerCase().replace(/ /g, '-')}`);
+    await playSolution(page);
+    await page.waitForSelector('#modal:not([hidden])');
+    assert.equal(await page.textContent('#modal-title'), 'Solved!');
+    await page.click('#modal-buttons button >> nth=0');
+  }
   assert.deepEqual(page.errors, []);
 });
 
@@ -77,7 +134,7 @@ test('campaign: solve level 1 with swipes and get 3 stars', async () => {
   assert.equal(await page.locator('#modal-body .stars').evaluate((e) => e.firstChild.textContent), '★★★');
   await shot(page, 'level1-solved');
   const store = await page.evaluate(() => window.__neo.store());
-  assert.equal(store.campaign[0], 6);
+  assert.equal(store.campaign['The Sketch'], 6);
   // Progress survives a reload, and level 2 is unlocked.
   await page.reload();
   await page.click('#modes .mode >> nth=0');
@@ -87,18 +144,13 @@ test('campaign: solve level 1 with swipes and get 3 stars', async () => {
 });
 
 test('campaign: every level can be finished in the real game', async () => {
-  const page = await newPage();
-  await dismissIntro(page);
-  await page.evaluate((n) => {
-    const s = window.__neo.store();
-    for (let i = 0; i < n; i++) s.campaign[i] = 999;
-  }, LEVELS.length);
+  const page = await newPage({ cleared: LEVELS.length });
   for (let i = 0; i < LEVELS.length; i++) {
     await page.evaluate(() => document.querySelector('[data-action=home]').click());
     await page.click('#modes .mode >> nth=0');
     await page.click(`.world-grid button[aria-label^="Level ${i + 1}:"]`);
     if (i === 20) await shot(page, 'level21');
-    await playSolution(page, LEVELS[i].map);
+    await playSolution(page);
     await page.waitForSelector('#modal:not([hidden])');
     assert.equal(await page.textContent('#modal-title'), 'Solved!', `level ${i + 1}`);
     await page.click('#modal-buttons button >> nth=0'); // close via Replay to keep the loop simple
@@ -107,10 +159,9 @@ test('campaign: every level can be finished in the real game', async () => {
 });
 
 test('falling restarts the level', async () => {
-  const page = await newPage();
-  await dismissIntro(page);
+  const page = await newPage({ cleared: 4 });
   await page.click('#modes .mode >> nth=0');
-  await page.click('.world-grid button >> nth=0');
+  await page.click('.world-grid button >> nth=3');
   await page.keyboard.press('ArrowLeft');
   await page.waitForFunction(() => !window.__neo.play.frozen && window.__neo.play.moves === 0, null, { timeout: 3000 });
   assert.deepEqual(page.errors, []);
@@ -123,8 +174,7 @@ test('descent: clear a floor, pick a perk, lose hearts until the run ends', asyn
   await dismissIntro(page); // Descent intro
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
   await shot(page, 'descent');
-  const map = await page.evaluate(() => window.__neo.play.level.map);
-  await playSolution(page, map);
+  await playSolution(page);
   await page.waitForSelector('.perks button');
   await shot(page, 'perks');
   assert.equal(await page.locator('.perks button').count(), 3);
@@ -154,8 +204,7 @@ test('rush: solving adds time and the clock ends the game', async () => {
   await dismissIntro(page);
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'rush');
   await shot(page, 'rush');
-  const map = await page.evaluate(() => window.__neo.play.level.map);
-  await playSolution(page, map);
+  await playSolution(page);
   await page.waitForFunction(() => window.__neo.session.title === 'Rush · Puzzle 2');
   // Fast-forward the clock.
   await page.evaluate(() => window.__neo.session.tick(1e6));
@@ -170,8 +219,7 @@ test('daily: solve today\'s puzzle and start a streak', async () => {
   await dismissIntro(page);
   await page.click('#modes .mode >> nth=3');
   await shot(page, 'daily');
-  const map = await page.evaluate(() => window.__neo.play.level.map);
-  await playSolution(page, map);
+  await playSolution(page);
   await page.waitForSelector('#modal:not([hidden])');
   assert.equal(await page.textContent('#modal-title'), 'Daily solved!');
   assert.match(await page.textContent('#modal-body'), /Streak: 1 day/);
@@ -183,7 +231,7 @@ test('precision: going over the move limit fails the level', async () => {
   await dismissIntro(page);
   await page.evaluate(() => {
     const s = window.__neo.store();
-    s.campaign[0] = 6;
+    s.campaign['The Sketch'] = 6;
     localStorage.setItem('neo-bloxorz-v1', JSON.stringify(s));
   });
   await page.reload();
@@ -204,13 +252,13 @@ test('precision: going over the move limit fails the level', async () => {
 });
 
 test('hint shows the best next move', async () => {
-  const page = await newPage();
-  await dismissIntro(page);
+  const page = await newPage({ cleared: 4 });
   await page.click('#modes .mode >> nth=0');
-  await page.click('.world-grid button >> nth=0');
+  await page.click('.world-grid button >> nth=3');
   await page.click('#btn-hint');
   const hint = await page.evaluate(() => window.__neo.play.hint);
-  assert.ok(['right', 'up'].includes(hint));
+  const best = await page.evaluate(() => Engine.solve(window.__neo.play.level)[0]);
+  assert.equal(hint, best);
   await shot(page, 'hint');
   assert.deepEqual(page.errors, []);
 });
@@ -225,5 +273,59 @@ test('settings toggle the on-screen arrows', async () => {
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=0');
   assert.equal(await page.isVisible('#dpad'), false);
+  assert.deepEqual(page.errors, []);
+});
+
+test('walking into a dead end tells the player', async () => {
+  // Find the first non-tutorial level with a reachable dead end, and the moves to get there.
+  let target = null;
+  LEVELS.forEach((def, index) => {
+    if (target || def.tutorial) return;
+    const level = Engine.parseLevel(def);
+    const start = Engine.initialState(level);
+    const prev = new Map([[Engine.stateKey(start), null]]);
+    const queue = [start];
+    while (queue.length && !target) {
+      const s = queue.shift();
+      for (const dir of Object.keys(Engine.DIRS)) {
+        const r = Engine.move(level, s, dir);
+        if (r.outcome !== 'ok') continue;
+        const key = Engine.stateKey(r.state);
+        if (prev.has(key)) continue;
+        prev.set(key, { from: Engine.stateKey(s), dir });
+        if (!Engine.solve(level, r.state)) {
+          const path = [];
+          for (let k = key; prev.get(k); k = prev.get(k).from) path.unshift(prev.get(k).dir);
+          target = { index, path };
+          break;
+        }
+        queue.push(r.state);
+      }
+    }
+  });
+  assert.ok(target, 'some level has a dead end');
+  const page = await newPage({ cleared: target.index });
+  await page.click('#modes .mode >> nth=0');
+  await page.click(`.world-grid button[aria-label^="Level ${target.index + 1}:"]`);
+  for (const dir of target.path) {
+    await page.keyboard.press(KEY[dir]);
+    await page.waitForFunction(() => !window.__neo.play.anim);
+  }
+  assert.match(await page.textContent('#toast'), /No way to the goal/);
+  assert.ok(await page.isVisible('#toast'));
+  assert.deepEqual(page.errors, []);
+});
+
+test('progress saved by 1.1 is kept, mapped to the same levels by name', async () => {
+  const page = await newPage({ fresh: true });
+  await page.evaluate(() => localStorage.setItem('neo-bloxorz-v1', JSON.stringify({
+    version: 2, seenIntro: { howto: true }, campaign: { 0: 6, 2: 4, 9: 12 }, hinted: { 9: true }, rushBest: 7,
+  })));
+  await page.reload();
+  const store = await page.evaluate(() => window.__neo.store());
+  assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, 'Thin Ice': 12 });
+  assert.deepEqual(store.hinted, { 'Thin Ice': true });
+  assert.equal(store.rushBest, 7);
+  assert.equal(store.version, 3);
   assert.deepEqual(page.errors, []);
 });

@@ -146,3 +146,25 @@ button.icon { width: 46px; height: 46px; padding: 0; font-size: 24px; flex: none
 .t-switch { background: #232a5c; border: 1.5px solid #323b80; box-shadow: inset 0 0 0 5px #232a5c, inset 0 0 0 8px #8b7bff; border-radius: 50% !important; }
 .t-heavy { background: #232a5c; border: 4px solid #8b7bff; border-radius: 50% !important; }
 .t-bridge { background: #3a2f6b; border: 1.5px solid #8b7bff; }
+
+/* Tutorial coach */
+.coach {
+  position: relative; margin: 8px 0 0; padding: 12px 14px; border-radius: 16px;
+  background: linear-gradient(135deg, #2b2f6e, #1d2150); border: 1px solid #5a63c9;
+  box-shadow: 0 8px 24px #0006; font-size: 15px; line-height: 1.35;
+  animation: coach-in 0.25s ease;
+}
+.coach[hidden] { display: none; }
+.coach::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; width: 14px; height: 14px;
+  background: #1f2354; border-right: 1px solid #5a63c9; border-bottom: 1px solid #5a63c9;
+  transform: translateX(-50%) rotate(45deg);
+}
+.coach.nudge { animation: coach-nudge 0.35s ease; }
+.coach-dots { display: flex; gap: 5px; justify-content: center; margin-top: 8px; }
+.coach-dots span { width: 6px; height: 6px; border-radius: 50%; background: #ffffff33; }
+.coach-dots span.on { background: var(--accent); }
+@keyframes coach-in { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes coach-nudge { 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+.dpad button.coach-pulse { border-color: var(--accent); box-shadow: 0 0 0 0 #39f3c8aa; animation: pad-pulse 1.1s ease infinite; }
+@keyframes pad-pulse { 0% { box-shadow: 0 0 0 0 #39f3c8aa; } 100% { box-shadow: 0 0 0 12px #39f3c800; } }
