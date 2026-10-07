@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const Engine = require('../www/js/engine.js');
 const LEVELS = require('../www/js/levels.js');
 
-test('campaign has 30 levels in 3 worlds', () => {
-  assert.equal(LEVELS.length, 30);
-  assert.deepEqual([...new Set(LEVELS.map((l) => l.world))], [1, 2, 3]);
+test('campaign has 32 levels in 4 worlds', () => {
+  assert.equal(LEVELS.length, 32);
+  assert.deepEqual([...new Set(LEVELS.map((l) => l.world))], [1, 2, 3, 4]);
+  assert.equal(LEVELS.WORLDS.length, 4);
   assert.equal(new Set(LEVELS.map((l) => l.name)).size, LEVELS.length, 'names are unique');
 });
 
@@ -26,9 +27,27 @@ LEVELS.forEach((def, i) => {
   });
 });
 
-test('campaign difficulty ramps within each world', () => {
-  for (const world of [2, 3]) {
-    const pars = LEVELS.filter((l) => l.world === world).map((l) => Engine.solve(Engine.parseLevel(l)).length);
-    assert.ok(pars[pars.length - 1] > pars[0], `world ${world} ends harder than it starts`);
-  }
+test('every level after the first tutorial is a puzzle: it needs wall bumps', () => {
+  LEVELS.slice(1).forEach((def, i) => {
+    const bumps = Engine.minBumps(Engine.parseLevel(def));
+    assert.ok(bumps >= 1, `level ${i + 2} "${def.name}" needs ${bumps} bumps`);
+  });
+});
+
+test('puzzles get harder: later worlds need more bumps on average', () => {
+  const avg = (w) => {
+    const ls = LEVELS.filter((l) => l.world === w).map((l) => Engine.minBumps(Engine.parseLevel(l)));
+    return ls.reduce((a, b) => a + b, 0) / ls.length;
+  };
+  assert.ok(avg(4) > avg(1));
+  assert.ok(avg(2) > avg(1));
+});
+
+test('each world uses its mechanic', () => {
+  // The first tutorial only teaches rolling, so it has no walls.
+  const has = (w, re) => LEVELS.slice(1).filter((l) => l.world === w).every((l) => re.test(l.map.join('')));
+  assert.ok(has(1, /X/), 'walls in world 1');
+  assert.ok(LEVELS.filter((l) => l.world === 2).every((l) => /!/.test(l.map.join(''))), 'glass in world 2');
+  assert.ok(has(3, /[abcd]/), 'shape tiles in world 3');
+  assert.ok(has(4, /[oO]/), 'switches in world 4');
 });

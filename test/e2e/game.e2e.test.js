@@ -123,7 +123,7 @@ test('descent: clear a floor, pick a perk, lose hearts until the run ends', asyn
   await dismissIntro(page); // Descent intro
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
   await shot(page, 'descent');
-  const map = await page.evaluate(() => window.__neo.play.level.slots);
+  const map = await page.evaluate(() => window.__neo.play.level.map);
   await playSolution(page, map);
   await page.waitForSelector('.perks button');
   await shot(page, 'perks');
@@ -154,7 +154,7 @@ test('rush: solving adds time and the clock ends the game', async () => {
   await dismissIntro(page);
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'rush');
   await shot(page, 'rush');
-  const map = await page.evaluate(() => window.__neo.play.level.slots);
+  const map = await page.evaluate(() => window.__neo.play.level.map);
   await playSolution(page, map);
   await page.waitForFunction(() => window.__neo.session.title === 'Rush · Puzzle 2');
   // Fast-forward the clock.
@@ -170,7 +170,7 @@ test('daily: solve today\'s puzzle and start a streak', async () => {
   await dismissIntro(page);
   await page.click('#modes .mode >> nth=3');
   await shot(page, 'daily');
-  const map = await page.evaluate(() => window.__neo.play.level.slots);
+  const map = await page.evaluate(() => window.__neo.play.level.map);
   await playSolution(page, map);
   await page.waitForSelector('#modal:not([hidden])');
   assert.equal(await page.textContent('#modal-title'), 'Daily solved!');
@@ -220,7 +220,7 @@ test('settings toggle the on-screen arrows', async () => {
   await dismissIntro(page);
   await page.click('#btn-settings');
   await shot(page, 'settings');
-  await page.locator('.settings input >> nth=2').uncheck();
+  await page.locator('.settings input >> nth=3').uncheck();
   await page.click('#modal-buttons .primary');
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=0');

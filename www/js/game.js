@@ -1,5 +1,5 @@
 (function () {
-  const { parseLevel, initialState, tileAt, move, solve, slotSize } = Engine;
+  const { parseLevel, initialState, tileAt, move, solve } = Engine;
   const $ = (id) => document.getElementById(id);
   const css = getComputedStyle(document.documentElement);
   const SHAPE_COLORS = ['--shape0', '--shape1', '--shape2', '--shape3'].map((v) => css.getPropertyValue(v).trim());
@@ -7,7 +7,9 @@
 
   // ---------- Storage ----------
   const STORE_KEY = 'neo-bloxorz-v1';
+  const STORE_VERSION = 2;
   const DEFAULTS = {
+    version: STORE_VERSION,
     campaign: {}, // level index -> best moves
     hinted: {}, // level index -> true if solved only with hints
     precision: {}, // level index -> best moves within the limit
@@ -17,7 +19,7 @@
     rushBest: 0,
     daily: {}, // date -> best moves
     seenIntro: {},
-    settings: { sound: true, vibration: true, dpad: true },
+    settings: { sound: true, vibration: true, dpad: true, preview: true },
   };
   let store = load();
   function load() {
@@ -25,7 +27,13 @@
     try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { data = null; }
     const base = JSON.parse(JSON.stringify(DEFAULTS));
     if (!data || typeof data !== 'object') return base;
-    return { ...base, ...data, settings: { ...base.settings, ...(data.settings || {}) } };
+    const merged = { ...base, ...data, settings: { ...base.settings, ...(data.settings || {}) } };
+    if (data.version !== STORE_VERSION) {
+      // 1.1 replaced the campaign and the generator: old level progress and runs no longer apply.
+      Object.assign(merged, { campaign: {}, hinted: {}, precision: {}, run: null, daily: {}, version: STORE_VERSION });
+      merged.seenIntro = {};
+    }
+    return merged;
   }
   function save() {
     try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { /* storage unavailable */ }
@@ -108,7 +116,7 @@
     const cards = [
       {
         glyph: '▶', color: 'var(--shape0)', name: 'Campaign',
-        desc: '30 handmade puzzles across 3 worlds.',
+        desc: `${LEVELS.length} puzzles across ${WORLDS.length} worlds.`,
         meta: `${done}/${LEVELS.length}<br>★ ${totalStars()}`,
         action: () => openLevels('campaign'),
       },
@@ -589,6 +597,17 @@
     Sound.unlock();
     const from = play.state;
     const r = move(play.level, from, dir);
+    if (r.outcome === 'blocked') {
+      play.shake = 0.4;
+      Sound.blocked();
+      return;
+    }
+    if (r.bumped) {
+      const hit = Engine.cellsOf(Engine.roll(from, dir)).filter(([x, y]) => tileAt(play.level, from.open, x, y) === 'X');
+      play.flash = { cells: new Set(hit.map(([x, y]) => `${x},${y}`)), at: performance.now() };
+      Sound.bump();
+      vibrate(10);
+    }
     play.history.push(from);
     play.moves++;
     play.hint = null;
@@ -668,97 +687,124 @@
     ctx.closePath();
   }
 
-  function slotRects(level) {
-    if (level._slotRects) return level._slotRects;
-    const rows = level.slots.length;
-    const out = [];
-    let ty = level.height;
-    for (let r = rows - 1; r >= 0; r--) {
-      const sh = slotSize(rows - 1 - r);
-      ty -= sh;
-      let tx = 0;
-      for (let c = 0; c < level.slots[r].length; c++) {
-        const sw = slotSize(c);
-        out.push({ x: tx, y: ty, w: sw, h: sh, t: level.slots[r][c] });
-        tx += sw;
-      }
-    }
-    level._slotRects = out;
-    return out;
-  }
-
-  function slotBroken(s) {
-    for (let dy = 0; dy < s.h; dy++) for (let dx = 0; dx < s.w; dx++) if (play.broken.has(`${s.x + dx},${s.y + dy}`)) return true;
-    return false;
-  }
-
   function drawBoard(now) {
     const level = play.level;
     const gap = Math.max(2, unit * 0.08);
     const open = play.state.open;
-    const goalColor = level.goal ? SHAPE_COLORS[shapeIndex(level.goal.w, level.goal.h)] : '#fff';
-    for (const s of slotRects(level)) {
-      if (s.t === '.' || slotBroken(s)) continue;
-      const x = s.x * unit + gap / 2;
-      const y = s.y * unit + gap / 2;
-      const w = s.w * unit - gap;
-      const h = s.h * unit - gap;
-      const eff = tileAt(level, open, s.x, s.y);
-      const isBridge = s.t === '=' || s.t === '+';
-      roundRect(x, y, w, h, unit * 0.18);
-      if (isBridge && eff === '.') {
-        ctx.setLineDash([4, 4]);
-        ctx.strokeStyle = '#ffffff30';
+    const r = unit * 0.18;
+    for (let ty = 0; ty < level.height; ty++) {
+      for (let tx = 0; tx < level.width; tx++) {
+        const t = level.tiles[ty][tx];
+        if (t === '.' || play.broken.has(`${tx},${ty}`)) continue;
+        const x = tx * unit + gap / 2;
+        const y = ty * unit + gap / 2;
+        const w = unit - gap;
+        const h = unit - gap;
+        const isBridge = t === '=' || t === '+';
+        if (t === 'X') {
+          // Walls stand out as raised blocks.
+          const flash = play.flash && play.flash.cells.has(`${tx},${ty}`) ? Math.max(0, 1 - (now - play.flash.at) / 300) : 0;
+          roundRect(x, y + 3, w, h - 3, r);
+          ctx.fillStyle = '#0b0e24';
+          ctx.fill();
+          roundRect(x, y, w, h - 3, r);
+          ctx.fillStyle = flash ? mixColor('#6b74c9', '#ffffff', flash) : '#6b74c9';
+          ctx.fill();
+          ctx.fillStyle = '#ffffff22';
+          roundRect(x + 3, y + 3, w - 6, (h - 3) * 0.3, r * 0.6);
+          ctx.fill();
+          continue;
+        }
+        roundRect(x, y, w, h, r);
+        if (isBridge && tileAt(level, open, tx, ty) === '.') {
+          ctx.setLineDash([4, 4]);
+          ctx.strokeStyle = '#ffffff30';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.setLineDash([]);
+          continue;
+        }
+        if (t === '!') {
+          ctx.fillStyle = '#9fe6ff22';
+          ctx.fill();
+          ctx.strokeStyle = '#9fe6ff99';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x + w * 0.25, y + h * 0.2);
+          ctx.lineTo(x + w * 0.5, y + h * 0.5);
+          ctx.lineTo(x + w * 0.4, y + h * 0.8);
+          ctx.moveTo(x + w * 0.5, y + h * 0.5);
+          ctx.lineTo(x + w * 0.8, y + h * 0.4);
+          ctx.stroke();
+          continue;
+        }
+        const shape = Engine.SHAPE_TILES[t];
+        if (shape) {
+          // Shape tiles: tinted with the shape's color and show the shape they accept.
+          const color = SHAPE_COLORS[shapeIndex(shape[0], shape[1])];
+          ctx.fillStyle = color + '40';
+          ctx.fill();
+          ctx.strokeStyle = color;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          const iw = (w * 0.22) * shape[0];
+          const ih = (h * 0.22) * shape[1];
+          roundRect(x + (w - iw) / 2, y + (h - ih) / 2, iw, ih, 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          continue;
+        }
+        ctx.fillStyle = isBridge ? '#3a2f6b' : '#232a5c';
+        ctx.fill();
+        ctx.strokeStyle = isBridge ? '#8b7bff' : '#323b80';
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        ctx.setLineDash([]);
-        continue;
-      }
-      if (s.t === 'G') {
-        const pulse = 0.55 + 0.45 * Math.sin(now / 300);
-        ctx.fillStyle = goalColor + '33';
-        ctx.fill();
-        ctx.shadowColor = goalColor;
-        ctx.shadowBlur = 14 * pulse;
-        ctx.strokeStyle = goalColor;
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        continue;
-      }
-      if (s.t === '!') {
-        ctx.fillStyle = '#9fe6ff22';
-        ctx.fill();
-        ctx.strokeStyle = '#9fe6ff99';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(x + w * 0.25, y + h * 0.2);
-        ctx.lineTo(x + w * 0.5, y + h * 0.5);
-        ctx.lineTo(x + w * 0.4, y + h * 0.8);
-        ctx.moveTo(x + w * 0.5, y + h * 0.5);
-        ctx.lineTo(x + w * 0.8, y + h * 0.4);
-        ctx.stroke();
-        continue;
-      }
-      ctx.fillStyle = isBridge ? '#3a2f6b' : '#232a5c';
-      ctx.fill();
-      ctx.strokeStyle = isBridge ? '#8b7bff' : '#323b80';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      if (s.t === 'S') {
-        ctx.strokeStyle = '#ffffff40';
-        ctx.strokeRect(x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4);
-      }
-      if (s.t === 'o' || s.t === 'O') {
-        const rad = Math.min(w, h) * (s.t === 'O' ? 0.3 : 0.22);
-        ctx.beginPath();
-        ctx.arc(x + w / 2, y + h / 2, rad, 0, Math.PI * 2);
-        ctx.strokeStyle = open ? '#39f3c8' : '#8b7bff';
-        ctx.lineWidth = s.t === 'O' ? 5 : 3;
-        ctx.stroke();
+        if (t === 'S') {
+          ctx.strokeStyle = '#ffffff40';
+          ctx.strokeRect(x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4);
+        }
+        if (t === 'o' || t === 'O') {
+          const rad = Math.min(w, h) * (t === 'O' ? 0.3 : 0.22);
+          ctx.beginPath();
+          ctx.arc(x + w / 2, y + h / 2, rad, 0, Math.PI * 2);
+          ctx.strokeStyle = open ? '#39f3c8' : '#8b7bff';
+          ctx.lineWidth = t === 'O' ? 5 : 3;
+          ctx.stroke();
+        }
       }
     }
+    // The goal is drawn as one glowing outline with the shape it needs.
+    const g = level.goal;
+    if (g) {
+      const color = SHAPE_COLORS[shapeIndex(g.w, g.h)];
+      const pulse = 0.55 + 0.45 * Math.sin(now / 300);
+      roundRect(g.x * unit + gap / 2, g.y * unit + gap / 2, g.w * unit - gap, g.h * unit - gap, r);
+      ctx.fillStyle = color + '33';
+      ctx.fill();
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 14 * pulse;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  // Faint outlines of where each swipe would land (moves that fall or are blocked are not shown).
+  function drawPreview() {
+    const inset = Math.max(3, unit * 0.12);
+    ctx.setLineDash([3, 4]);
+    ctx.lineWidth = 1.5;
+    for (const dir of Object.keys(Engine.DIRS)) {
+      const r = move(play.level, play.state, dir);
+      if (r.outcome !== 'ok' && r.outcome !== 'win') continue;
+      const n = r.state;
+      roundRect(n.x * unit + inset, n.y * unit + inset, n.w * unit - inset * 2, n.h * unit - inset * 2, unit * 0.2);
+      ctx.strokeStyle = SHAPE_COLORS[shapeIndex(n.w, n.h)] + (r.bumped ? 'cc' : '77');
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
   }
 
   function drawBlock(b, alpha, scale) {
@@ -915,6 +961,7 @@
         }
       }
     }
+    if (store.settings.preview && !play.anim && !play.frozen) drawPreview();
     drawBlock(block, alpha, scale);
     if (play.hint && !play.anim) drawHint(block, play.hint, now);
     drawParticles();
@@ -925,7 +972,7 @@
   function openSettings() {
     const node = document.createElement('div');
     node.className = 'settings';
-    const items = [['sound', 'Sound'], ['vibration', 'Vibration'], ['dpad', 'On-screen arrows']];
+    const items = [['preview', 'Show where each move lands'], ['sound', 'Sound'], ['vibration', 'Vibration'], ['dpad', 'On-screen arrows']];
     items.forEach(([key, label]) => {
       const l = document.createElement('label');
       l.innerHTML = `<span>${label}</span>`;
