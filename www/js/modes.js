@@ -92,6 +92,18 @@
     else throw new Error('Unknown perk ' + perk);
   }
 
+  // One second chance per run (offered for watching a rewarded ad): back to 1 heart.
+  function canRevive(run) {
+    return run.over && !run.revived;
+  }
+  function runRevive(run) {
+    if (!canRevive(run)) return false;
+    run.revived = true;
+    run.over = false;
+    run.hearts = 1;
+    return true;
+  }
+
   function runSkip(run) {
     if (run.skips <= 0) return false;
     run.skips--;
@@ -101,6 +113,7 @@
 
   // ---------- Rush: time attack ----------
   const RUSH_START_SECONDS = 90;
+  const RUSH_EXTRA_SECONDS = 30; // one rewarded "more time" per session
   function rushBonus(depth, moves, par) {
     return 10 + Math.min(15, depth * 2) + (moves <= par ? 5 : 0);
   }
@@ -132,8 +145,8 @@
 
   const api = {
     starsFor, precisionLimit,
-    PERKS, MAX_HEARTS, createRun, runFloor, runFloorSeed, runBudget, runFail, runClear, perkChoices, applyPerk, runSkip,
-    RUSH_START_SECONDS, rushBonus, rushDepthFor, rushFloor,
+    PERKS, MAX_HEARTS, createRun, runFloor, runFloorSeed, runBudget, runFail, runClear, perkChoices, applyPerk, runSkip, canRevive, runRevive,
+    RUSH_START_SECONDS, RUSH_EXTRA_SECONDS, rushBonus, rushDepthFor, rushFloor,
     dateKey, dailyFloor, dailyStreak,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

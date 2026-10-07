@@ -70,22 +70,50 @@ jobs:
       - name: Sync web assets into the Android project
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
-      - name: Name the APK after the version
+      # Signed release builds need the upload key in GitHub secrets (see docs/PLAY_STORE.md).
+      - name: Decode upload key
+        id: key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/upload.jks"
+            echo "path=$RUNNER_TEMP/upload.jks" >> "$GITHUB_OUTPUT"
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret: skipping the signed Play Store build."
+          fi
+
+      - name: Build signed release (AAB for Google Play + APK)
+        if: steps.key.outputs.path != ''
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ steps.key.outputs.path }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew bundleRelease assembleRelease --no-daemon
+
+      - name: Name the builds after the version
         id: apk
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          cp android/app/build/outputs/apk/debug/app-debug.apk "neo-bloxorz-v$VERSION.apk"
-          echo "file=neo-bloxorz-v$VERSION.apk" >> "$GITHUB_OUTPUT"
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk "dist/neo-bloxorz-v$VERSION-debug.apk"
+          if [ -f android/app/build/outputs/bundle/release/app-release.aab ]; then
+            cp android/app/build/outputs/bundle/release/app-release.aab "dist/neo-bloxorz-v$VERSION.aab"
+            cp android/app/build/outputs/apk/release/app-release.apk "dist/neo-bloxorz-v$VERSION.apk"
+          fi
+          ls -l dist
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: neo-bloxorz-apk
-          path: ${{ steps.apk.outputs.file }}
+          name: neo-bloxorz-android
+          path: dist/*
 
       - name: Check the tag matches package.json
         if: startsWith(github.ref, 'refs/tags/v')
@@ -99,4 +127,36 @@ jobs:
           target_commitish: ${{ github.sha }}
           name: Neo Bloxorz v${{ steps.apk.outputs.version }}
           body_path: RELEASE_NOTES.md
-          files: ${{ steps.apk.outputs.file }}
+          files: dist/*
+
+  # The web version of the game and the privacy policy (required by Google Play for apps
+  # with ads), on GitHub Pages. Pages must be enabled once: Settings > Pages > Source:
+  # GitHub Actions.
+  pages:
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assemble the site
+        run: |
+          mkdir -p site
+          cp -r www/* site/
+          cp docs/privacy.html site/privacy.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      # Until Pages is enabled for the repo this step cannot deploy; it then only warns, so
+      # the rest of CI stays green.
+      - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true

@@ -20,7 +20,8 @@ test.after(async () => { if (browser) await browser.close(); });
 
 // Pages start as a returning player (first-launch tutorial already seen) unless `fresh`.
 // `cleared` marks that many campaign levels as solved so later ones are unlocked.
-async function newPage({ fresh = false, cleared = 0 } = {}) {
+// `ads` installs a fake AdMob backend that records calls in window.__adsLog.
+async function newPage({ fresh = false, cleared = 0, ads = false, brand = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -33,7 +34,30 @@ async function newPage({ fresh = false, cleared = 0 } = {}) {
       localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true }, campaign }));
     }, LEVELS.slice(0, cleared).map((l) => l.name));
   }
+  if (ads) {
+    await page.addInitScript(() => {
+      const log = (window.__adsLog = []);
+      const call = (name, result) => async (arg) => { log.push(name); return typeof result === 'function' ? result(arg) : result; };
+      window.__adsMock = {
+        initialize: call('initialize'),
+        requestConsentInfo: call('requestConsentInfo', { status: 'NOT_REQUIRED', isConsentFormAvailable: false, canRequestAds: true, privacyOptionsRequirementStatus: 'REQUIRED' }),
+        showConsentForm: call('showConsentForm'),
+        showPrivacyOptionsForm: call('showPrivacyOptionsForm'),
+        addListener: () => ({ remove() {} }),
+        showBanner: call('showBanner'),
+        removeBanner: call('removeBanner'),
+        prepareInterstitial: call('prepareInterstitial', { adUnitId: 'test' }),
+        showInterstitial: call('showInterstitial'),
+        prepareRewardVideoAd: call('prepareRewardVideoAd', { adUnitId: 'test' }),
+        showRewardVideoAd: call('showRewardVideoAd', { type: 'reward', amount: 1 }),
+      };
+    });
+  }
   await page.goto(URL);
+  if (!brand) {
+    // Skip the brand splash (it has its own test).
+    await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+  }
   page.errors = errors;
   return page;
 }
@@ -327,5 +351,151 @@ test('progress saved by 1.1 is kept, mapped to the same levels by name', async (
   assert.deepEqual(store.hinted, { 'Thin Ice': true });
   assert.equal(store.rushBest, 7);
   assert.equal(store.version, 3);
+  assert.deepEqual(page.errors, []);
+});
+
+test('the brand splash shows at launch, then the game', async () => {
+  const page = await newPage({ brand: true });
+  assert.ok(await page.isVisible('#brand'));
+  assert.match(await page.textContent('#brand'), /GHORBEL\s*GAMES/);
+  await shot(page, 'brand');
+  await page.waitForSelector('#brand', { state: 'hidden', timeout: 4000 });
+  assert.ok(await page.isVisible('#home'));
+  await page.click('#btn-settings');
+  assert.match(await page.textContent('.settings .about'), /Ghorbel Games/);
+  assert.deepEqual(page.errors, []);
+});
+
+test('ads: banner on menus only, never during play', async () => {
+  const page = await newPage({ ads: true, cleared: 4 });
+  await page.waitForFunction(() => window.__adsLog.includes('showBanner'));
+  await shot(page, 'home-with-banner-space');
+  await page.click('#modes .mode >> nth=0');
+  await page.click('.world-grid button >> nth=3');
+  await page.waitForFunction(() => window.__adsLog.includes('removeBanner'));
+  const before = await page.evaluate(() => window.__adsLog.filter((c) => c === 'showBanner').length);
+  await page.click('#btn-quit');
+  await page.waitForFunction((n) => window.__adsLog.filter((c) => c === 'showBanner').length > n, before);
+  // Privacy choices are offered where consent rules apply.
+  await page.click('[data-action=home]');
+  await page.click('#btn-settings');
+  assert.ok(await page.isVisible('text=Privacy choices (ads)'));
+  assert.deepEqual(page.errors, []);
+});
+
+async function failPrecision(page) {
+  await page.click('#modes .mode >> nth=4');
+  await page.click('.world-grid button >> nth=0');
+  for (let i = 0; i < 4; i++) {
+    for (const key of ['ArrowRight', 'ArrowLeft']) {
+      await page.keyboard.press(key);
+      await page.waitForFunction(() => !window.__neo.play.anim);
+    }
+  }
+  await page.waitForSelector('#modal:not([hidden])');
+  assert.equal(await page.textContent('#modal-title'), 'Out of moves');
+}
+
+test('ads: a full-screen ad after losing, at most every other loss', async () => {
+  const page = await newPage({ ads: true, cleared: 1 });
+  await failPrecision(page);
+  await page.click('#modal-buttons button >> nth=0'); // Levels (1st loss: no ad)
+  await page.click('[data-action=home]');
+  assert.equal(await page.evaluate(() => window.__adsLog.filter((c) => c === 'showInterstitial').length), 0);
+  await failPrecision(page);
+  await page.click('#modal-buttons button >> nth=0'); // 2nd loss: ad
+  await page.waitForFunction(() => window.__adsLog.includes('showInterstitial'));
+  assert.ok(await page.isVisible('#levels-screen'), 'continues after the ad');
+  assert.deepEqual(page.errors, []);
+});
+
+test('ads: watch an ad to continue a Descent run, once', async () => {
+  const page = await newPage({ ads: true });
+  await page.click('#modes .mode >> nth=1');
+  await dismissIntro(page);
+  await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
+  const fallUntilModal = async () => {
+    for (let i = 0; i < 12 && !(await page.isVisible('#modal')); i++) {
+      await page.keyboard.press('ArrowLeft');
+      await page.waitForTimeout(700);
+    }
+    await page.waitForSelector('#modal:not([hidden])');
+  };
+  await fallUntilModal();
+  assert.equal(await page.textContent('#modal-title'), 'Out of hearts');
+  await shot(page, 'revive-offer');
+  await page.click('#modal-buttons .primary');
+  await page.waitForFunction(() => window.__adsLog.includes('showRewardVideoAd'));
+  await page.waitForFunction(() => !window.__neo.play.frozen);
+  assert.equal(await page.evaluate(() => window.__neo.store().run.hearts), 1);
+  await fallUntilModal();
+  assert.equal(await page.textContent('#modal-title'), 'Run over', 'no second revive');
+  assert.deepEqual(page.errors, []);
+});
+
+test('ads: watch an ad for more time in Rush, once', async () => {
+  const page = await newPage({ ads: true });
+  await page.click('#modes .mode >> nth=2');
+  await dismissIntro(page);
+  await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'rush');
+  await page.evaluate(() => window.__neo.session.tick(1e6));
+  await page.waitForSelector('#modal:not([hidden])');
+  assert.match(await page.textContent('#modal-body'), /\+30 s/);
+  await page.click('#modal-buttons .primary');
+  await page.waitForFunction(() => window.__adsLog.includes('showRewardVideoAd'));
+  await page.waitForFunction(() => document.getElementById('modal').hidden);
+  assert.match(await page.textContent('#chips'), /⏱ (29|30)\./);
+  await page.evaluate(() => window.__neo.session.tick(1e6));
+  await page.waitForSelector('#modal:not([hidden])');
+  assert.match(await page.textContent('#modal-body'), /puzzles solved/);
+  assert.doesNotMatch(await page.textContent('#modal-body'), /\+30 s/, 'only once');
+  assert.deepEqual(page.errors, []);
+});
+
+test('ads: out of hints in Descent, an ad gives one', async () => {
+  const page = await newPage({ ads: true });
+  await page.click('#modes .mode >> nth=1');
+  await dismissIntro(page);
+  await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
+  await page.evaluate(() => { window.__neo.store().run.hints = 0; });
+  await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => !window.__neo.play.anim);
+  assert.equal(await page.textContent('#btn-hint'), 'Hint ▶ ad');
+  await page.click('#btn-hint');
+  await page.waitForFunction(() => window.__neo.play.hint);
+  assert.ok((await page.evaluate(() => window.__adsLog)).includes('showRewardVideoAd'));
+  assert.deepEqual(page.errors, []);
+});
+
+test('ads: "Remove ads" turns off banners and full-screen ads', async () => {
+  const page = await newPage({ ads: true, cleared: 1 });
+  await page.waitForFunction(() => window.__adsLog.includes('showBanner'));
+  await page.click('#btn-settings');
+  await page.click('text=Remove ads');
+  assert.equal(await page.textContent('#modal-title'), 'Remove ads');
+  await page.click('#modal-buttons .primary');
+  await page.evaluate(() => window.__neo.setAdsRemoved(true));
+  await page.waitForFunction(() => window.__adsLog.includes('removeBanner'));
+  await page.click('#modal-buttons .primary'); // close settings
+  await failPrecision(page);
+  await page.click('#modal-buttons button >> nth=0');
+  await page.click('[data-action=home]');
+  await failPrecision(page);
+  await page.click('#modal-buttons button >> nth=0');
+  await page.waitForTimeout(300);
+  const log = await page.evaluate(() => window.__adsLog);
+  assert.equal(log.filter((c) => c === 'showInterstitial').length, 0);
+  assert.equal(log.lastIndexOf('showBanner') < log.lastIndexOf('removeBanner'), true, 'no banner after removing ads');
+  assert.deepEqual(page.errors, []);
+});
+
+test('without an ad backend (web), no ad offers appear', async () => {
+  const page = await newPage();
+  await page.click('#modes .mode >> nth=2');
+  await dismissIntro(page);
+  await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'rush');
+  await page.evaluate(() => window.__neo.session.tick(1e6));
+  await page.waitForSelector('#modal:not([hidden])');
+  assert.doesNotMatch(await page.textContent('#modal-body'), /ad/);
   assert.deepEqual(page.errors, []);
 });

@@ -6,6 +6,8 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
+  const APP_VERSION = '1.3.0';
+  const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
   // 1.1 (store version 2) saved campaign progress by level number, in this order.
@@ -24,6 +26,7 @@
     rushBest: 0,
     daily: {}, // date -> best moves
     seenIntro: {},
+    adsRemoved: false, // set by the "Remove ads" purchase (see openRemoveAds)
     settings: { sound: true, vibration: true, dpad: true, preview: true },
   };
   let store = load();
@@ -61,8 +64,14 @@
   const SCREENS = ['home', 'levels-screen', 'game'];
   function show(id) {
     SCREENS.forEach((s) => { $(s).hidden = s !== id; });
-    if (id === 'game') requestAnimationFrame(resize);
+    if (id === 'game') {
+      Ads.hideBanner();
+      requestAnimationFrame(resize);
+    } else Ads.showBanner();
   }
+
+  // Wraps a button action so a full-screen ad may play first (after a loss, capped).
+  const afterLossAd = (action) => () => Ads.afterLoss().then(() => action && action());
 
   function vibrate(ms) {
     if (!store.settings.vibration) return;
@@ -278,8 +287,8 @@
         modal({
           title: 'Out of moves',
           html: `The limit here is <b>${limit}</b> moves. The best solution takes <b>${par}</b>.`,
-          buttons: [{ label: 'Levels', action: () => openLevels('precision') }, { label: 'Retry', primary: true, action: retry }],
-          onClose: retry,
+          buttons: [{ label: 'Levels', action: afterLossAd(() => openLevels('precision')) }, { label: 'Retry', primary: true, action: afterLossAd(retry) }],
+          onClose: afterLossAd(retry),
         });
       },
       onWin(moves) {
@@ -348,9 +357,10 @@
       canUndo: () => run.undos > 0,
       useUndo() { run.undos--; persist(); },
       undoLabel: () => `Undo (${run.undos})`,
-      canHint: () => run.hints > 0,
-      useHint() { run.hints--; persist(); },
-      hintLabel: () => `Hint (${run.hints})`,
+      canHint: () => run.hints > 0 || Ads.available(),
+      hintNeedsAd: () => run.hints <= 0,
+      useHint() { if (run.hints > 0) run.hints--; persist(); },
+      hintLabel: () => (run.hints > 0 ? `Hint (${run.hints})` : 'Hint ▶ ad'),
       canSkip: () => run.skips > 0,
       skip() {
         if (!Modes.runSkip(run)) return;
@@ -424,19 +434,46 @@
         setTimeout(() => resetLevel(), 300);
       } else {
         Sound.lose();
-        const depth = run.depth;
-        const newBest = depth > store.runBest;
-        store.runBest = Math.max(store.runBest, depth);
-        store.sparksBest = Math.max(store.sparksBest, run.sparks);
-        store.run = null;
-        save();
-        modal({
-          title: 'Run over',
-          html: `<div class="big-number">${depth}</div>depth reached${newBest ? ' · <b>New best!</b>' : ''}<br>✦ ${run.sparks} sparks · best depth ${store.runBest}`,
-          buttons: [{ label: 'Home', action: showHome }, { label: 'New run', primary: true, action: newRun }],
-          onClose: showHome,
-        });
+        if (Ads.available() && Modes.canRevive(run)) offerRevive();
+        else endRun();
       }
+    }
+    // Once per run: watch an ad to keep going with one heart.
+    function offerRevive() {
+      modal({
+        title: 'Out of hearts',
+        html: `<div class="big-number">${run.depth}</div>Watch a short ad to continue this run with <b>1 ♥</b>?`,
+        buttons: [
+          { label: 'Give up', action: endRun },
+          { label: '▶ Continue', primary: true, action: () => Ads.rewarded().then((ok) => {
+            if (ok && Modes.runRevive(run)) {
+              persist();
+              Sound.perk();
+              toast('♥ Back in the run!');
+              resetLevel();
+            } else {
+              toast('No ad available right now');
+              endRun();
+            }
+          }) },
+        ],
+        onClose: endRun,
+      });
+    }
+    function endRun() {
+      run.over = true;
+      const depth = run.depth;
+      const newBest = depth > store.runBest;
+      store.runBest = Math.max(store.runBest, depth);
+      store.sparksBest = Math.max(store.sparksBest, run.sparks);
+      store.run = null;
+      save();
+      modal({
+        title: 'Run over',
+        html: `<div class="big-number">${depth}</div>depth reached${newBest ? ' · <b>New best!</b>' : ''}<br>✦ ${run.sparks} sparks · best depth ${store.runBest}`,
+        buttons: [{ label: 'Home', action: afterLossAd(showHome) }, { label: 'New run', primary: true, action: afterLossAd(newRun) }],
+        onClose: afterLossAd(showHome),
+      });
     }
     loadFloor();
     return s;
@@ -448,6 +485,7 @@
     let timeLeft = Modes.RUSH_START_SECONDS * 1000;
     let lastTick = 0;
     let over = false;
+    let extended = false;
     let par = 0;
     const s = {
       kind: 'rush',
@@ -481,15 +519,8 @@
           play.frozen = true;
           Sound.lose();
           vibrate(200);
-          const newBest = solved > store.rushBest;
-          store.rushBest = Math.max(store.rushBest, solved);
-          save();
-          modal({
-            title: "Time's up!",
-            html: `<div class="big-number">${solved}</div>puzzles solved${newBest ? ' · <b>New best!</b>' : ''}<br>Best: ${store.rushBest}`,
-            buttons: [{ label: 'Home', action: showHome }, { label: 'Again', primary: true, action: () => startSession(rushSession()) }],
-            onClose: showHome,
-          });
+          if (Ads.available() && !extended) offerMoreTime();
+          else endRush();
         }
         refreshHud();
       },
@@ -506,6 +537,38 @@
         setTimeout(() => { if (!over) { loadFloor(); loadLevel(s.level); } }, 350);
       },
     };
+    // Once per session: watch an ad for more time.
+    function offerMoreTime() {
+      modal({
+        title: "Time's up!",
+        html: `<div class="big-number">${solved}</div>puzzles solved. Watch a short ad for <b>+${Modes.RUSH_EXTRA_SECONDS} s</b>?`,
+        buttons: [
+          { label: 'Finish', action: endRush },
+          { label: `▶ +${Modes.RUSH_EXTRA_SECONDS} s`, primary: true, action: () => Ads.rewarded().then((ok) => {
+            if (!ok) { toast('No ad available right now'); endRush(); return; }
+            extended = true;
+            over = false;
+            timeLeft = Modes.RUSH_EXTRA_SECONDS * 1000;
+            play.frozen = false;
+            Sound.perk();
+            refreshHud();
+          }) },
+        ],
+        onClose: endRush,
+      });
+    }
+    function endRush() {
+      over = true;
+      const newBest = solved > store.rushBest;
+      store.rushBest = Math.max(store.rushBest, solved);
+      save();
+      modal({
+        title: "Time's up!",
+        html: `<div class="big-number">${solved}</div>puzzles solved${newBest ? ' · <b>New best!</b>' : ''}<br>Best: ${store.rushBest}`,
+        buttons: [{ label: 'Home', action: afterLossAd(showHome) }, { label: 'Again', primary: true, action: afterLossAd(() => startSession(rushSession())) }],
+        onClose: afterLossAd(showHome),
+      });
+    }
     function loadFloor() {
       const floor = Modes.rushFloor(seed, solved);
       par = floor.par;
@@ -732,6 +795,15 @@
 
   function hint() {
     if (!session || play.anim || play.frozen || !session.canHint()) return;
+    if (session.hintNeedsAd && session.hintNeedsAd()) {
+      // Out of hints: a rewarded ad gives one.
+      Ads.rewarded().then((ok) => (ok ? showHint() : toast('No ad available right now')));
+      return;
+    }
+    showHint();
+  }
+
+  function showHint() {
     const path = solve(play.level, play.state);
     if (!path || !path.length) { toast('No way out from here. Restart!'); return; }
     if (session.useHint) session.useHint();
@@ -1079,6 +1151,7 @@
       input.addEventListener('change', () => {
         store.settings[key] = input.checked;
         Sound.setEnabled(store.settings.sound);
+  Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
         save();
       });
       l.appendChild(input);
@@ -1098,7 +1171,40 @@
       });
     });
     node.appendChild(reset);
+    const removeAds = document.createElement('button');
+    removeAds.textContent = store.adsRemoved ? 'Ads removed ✓' : 'Remove ads';
+    removeAds.disabled = store.adsRemoved;
+    removeAds.addEventListener('click', openRemoveAds);
+    node.appendChild(removeAds);
+    if (Ads.privacyOptionsRequired()) {
+      const privacy = document.createElement('button');
+      privacy.textContent = 'Privacy choices (ads)';
+      privacy.addEventListener('click', () => Ads.showPrivacyOptions());
+      node.appendChild(privacy);
+    }
+    const about = document.createElement('p');
+    about.className = 'about';
+    about.innerHTML = `Neo Bloxorz ${APP_VERSION} · © Ghorbel Games<br><a href="${PRIVACY_URL}" target="_blank" rel="noopener">Privacy policy</a>`;
+    node.appendChild(about);
     modal({ title: 'Settings', node, buttons: [{ label: 'Done', primary: true, action: showHome }], onClose: showHome });
+  }
+
+  // "Remove ads" will be a one-time in-app purchase on Google Play. Billing needs the app to
+  // be set up in the Play Console first (see docs/PLAY_STORE.md); once it is, a successful
+  // purchase only has to call setAdsRemoved(true).
+  function openRemoveAds() {
+    modal({
+      title: 'Remove ads',
+      html: 'Removing ads will be a small one-time purchase once Neo Bloxorz is on Google Play. Thanks for supporting the game!<br><br>Rewarded ads (continue a run, extra time) always stay optional.',
+      buttons: [{ label: 'OK', primary: true, action: openSettings }],
+      onClose: openSettings,
+    });
+  }
+
+  function setAdsRemoved(value) {
+    store.adsRemoved = !!value;
+    save();
+    Ads.setRemoved(store.adsRemoved);
   }
 
   function openHowTo() {
@@ -1171,6 +1277,7 @@
   }
 
   Sound.setEnabled(store.settings.sound);
+  Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
   showHome();
   if (!store.seenIntro.howto) {
     // First launch: learn by playing, straight into the first tutorial level.
@@ -1180,5 +1287,5 @@
   }
 
   // Exposed for automated tests.
-  window.__neo = { play, get session() { return session; }, store: () => store, tryMove, campaignPars, coachStep };
+  window.__neo = { setAdsRemoved, play, get session() { return session; }, store: () => store, tryMove, campaignPars, coachStep };
 })();

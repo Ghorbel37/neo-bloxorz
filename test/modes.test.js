@@ -103,3 +103,25 @@ test('daily: streak counts consecutive days', () => {
   assert.equal(M.dailyStreak(['2026-10-04', '2026-10-06', '2026-10-07'], today), 2);
   assert.equal(M.dailyStreak([], today), 0);
 });
+
+test('run: one revive per run, back to one heart', () => {
+  const run = M.createRun(9);
+  assert.equal(M.canRevive(run), false, 'only when the run is over');
+  run.hearts = 1;
+  assert.equal(M.runFail(run, 'fall'), 'dead');
+  assert.equal(M.canRevive(run), true);
+  assert.equal(M.runRevive(run), true);
+  assert.equal(run.hearts, 1);
+  assert.equal(run.over, false);
+  assert.equal(M.runFail(run, 'fall'), 'dead');
+  assert.equal(M.canRevive(run), false, 'only once');
+  assert.equal(M.runRevive(run), false);
+});
+
+test('the app version shown in Settings matches package.json', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const pkg = require('../package.json');
+  const game = fs.readFileSync(path.join(__dirname, '../www/js/game.js'), 'utf8');
+  assert.match(game, new RegExp(`APP_VERSION = '${pkg.version.replace(/\./g, '\\.')}'`));
+});
