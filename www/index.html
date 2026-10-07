@@ -9,6 +9,19 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Brand splash, shown at every launch (tap to skip) -->
+  <div id="brand" class="brand" role="presentation">
+    <div class="brand-inner">
+      <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+        <rect x="6" y="6" width="16" height="34" rx="4" fill="#5aa8ff"/>
+        <rect x="26" y="6" width="32" height="34" rx="4" fill="#ff5fa2"/>
+        <rect x="6" y="44" width="16" height="14" rx="4" fill="#39f3c8"/>
+        <rect x="26" y="44" width="32" height="14" rx="4" fill="#ffb547"/>
+      </svg>
+      <div class="brand-name">GHORBEL<span>GAMES</span></div>
+      <div class="brand-sub">presents</div>
+    </div>
+  </div>
   <!-- Home -->
   <main id="home" class="screen">
     <header class="title">
@@ -110,6 +123,19 @@
   <script src="js/generator.js"></script>
   <script src="js/modes.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/ads.js"></script>
   <script src="js/game.js"></script>
+  <script>
+    (function () {
+      var brand = document.getElementById('brand');
+      var hide = function () {
+        if (brand.classList.contains('out')) return;
+        brand.classList.add('out');
+        setTimeout(function () { brand.hidden = true; }, 450);
+      };
+      brand.addEventListener('pointerdown', hide);
+      setTimeout(hide, 1900);
+    })();
+  </script>
 </body>
 </html>

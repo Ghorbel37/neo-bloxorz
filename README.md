@@ -1,6 +1,8 @@
 # Neo Bloxorz
 
-A 2D mobile puzzle game about a block that changes shape every time it moves.
+A 2D mobile puzzle game by **Ghorbel Games** about a block that changes shape every time it moves.
+
+Play it in the browser: https://ghorbel37.github.io/neo-bloxorz/ (once GitHub Pages is enabled, see below).
 
 The block starts as a **small square** in the bottom-left corner:
 
@@ -49,6 +51,18 @@ thick, and each slot only fits one shape.
 Swipe on the board, use the on-screen pad, or press the arrow keys/WASD. `U` undoes, `R` restarts, `H` shows a hint.
 Dashed outlines show where each swipe would land (can be turned off in Settings).
 
+## Ads
+The Android app uses Google AdMob (`@capacitor-community/admob`), configured in `www/js/ads.js`:
+a banner on menu screens only (never over the puzzle), a full-screen ad after some losses
+(at most every 2nd loss and 90 s apart), and optional rewarded ads (continue a Descent run once,
++30 s in Rush once, a hint when out of hints). Consent is requested where required (EEA/UK) and
+can be changed in Settings. The web version has no ads. The IDs are Google's **test IDs** until
+you replace them; see [docs/PLAY_STORE.md](docs/PLAY_STORE.md).
+
+## Publishing to Google Play
+Step-by-step guide: [docs/PLAY_STORE.md](docs/PLAY_STORE.md). Listing text and graphics:
+[docs/play-store/](docs/play-store/). Privacy policy: [docs/privacy.html](docs/privacy.html).
+
 ## Project layout
 - `www/` — the game (plain HTML/CSS/JS, no build step)
   - `js/engine.js` — rules and a breadth-first solver (shared with node)
@@ -59,6 +73,7 @@ Dashed outlines show where each swipe would land (can be turned off in Settings)
     easier settings and ends with a fixed puzzle, so a mode always gets a solvable level.
   - `js/modes.js` — mode rules (hearts, perks, budgets, timers, streaks)
   - `js/audio.js` — synthesized sound effects
+  - `js/ads.js` — AdMob wrapper (no-op in the browser; tests inject a fake backend)
   - `js/game.js` — rendering, input, menus, saved progress
 - `android/` — Capacitor Android project
 - `test/` — unit tests (`npm test`) and Playwright end-to-end tests (`npm run test:e2e`).
@@ -67,6 +82,7 @@ Dashed outlines show where each swipe would land (can be turned off in Settings)
 - `tools/check-levels.js` — prints every campaign level's par and solution
 - `tools/make-campaign.js` — searches generator seeds for campaign levels (where each world's mechanic matters)
 - `tools/make-tutorials.js` — searches for the small boards used by the tutorial levels
+- `tools/make-store-assets.js` — renders the Play Store screenshots, feature graphic and icon
 - `tools/make-icons.js` — renders `www/icon.svg` into the Android icons and splash screens
 
 ## Develop
@@ -81,8 +97,9 @@ npx cap open android   # open in Android Studio
 ```
 
 ## CI and releases
-`.github/workflows/ci.yml` runs the unit and end-to-end tests, then builds the APK and uploads it
-as the `neo-bloxorz-apk` artifact. To release, bump `version` in `package.json` (the Android
+`.github/workflows/ci.yml` runs the unit and end-to-end tests, then builds the debug APK and, when
+the upload-key secrets are set, the signed AAB/APK for Google Play (artifact `neo-bloxorz-android`).
+On the default branch it also publishes the web version and privacy policy to GitHub Pages. To release, bump `version` in `package.json` (the Android
 versionName/versionCode follow it), update `RELEASE_NOTES.md`, then either push a matching tag
 (`v1.0.0`) or run the CI workflow manually from the Actions tab with **release** ticked. The APK is
 attached to the GitHub release.
