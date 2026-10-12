@@ -499,3 +499,43 @@ test('without an ad backend (web), no ad offers appear', async () => {
   assert.doesNotMatch(await page.textContent('#modal-body'), /ad/);
   assert.deepEqual(page.errors, []);
 });
+
+test('vibration uses native haptics in the app and respects the setting', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.addInitScript((names) => {
+    const log = (window.__hapticsLog = []);
+    window.__hapticsMock = {
+      impact: async (o) => { log.push(`impact:${o.style}`); },
+      vibrate: async (o) => { log.push(`vibrate:${o.duration}`); },
+    };
+    if (!localStorage.getItem('neo-bloxorz-v1')) {
+      const campaign = {};
+      for (const n of names) campaign[n] = 999;
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true }, campaign }));
+    }
+  }, LEVELS.slice(0, 4).map((l) => l.name));
+  await page.goto(URL);
+  await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+  // "Bump" tutorial: the second swipe bumps the wall (a light tick).
+  await page.click('#modes .mode >> nth=0');
+  await page.click('.world-grid button >> nth=1');
+  for (const key of ['ArrowRight', 'ArrowRight']) {
+    await page.keyboard.press(key);
+    await page.waitForFunction(() => !window.__neo.play.anim);
+  }
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('impact:LIGHT'), 'bump vibrates');
+  // A fall is a longer buzz.
+  await page.click('#modal-buttons button >> nth=0');
+  await page.evaluate(() => document.querySelector('[data-action=home]').click());
+  await page.click('#modes .mode >> nth=0');
+  await page.click('.world-grid button >> nth=3');
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForFunction(() => window.__hapticsLog.includes('vibrate:80'));
+  // Turned off in Settings: nothing.
+  await page.evaluate(() => { window.__neo.store().settings.vibration = false; window.__hapticsLog.length = 0; });
+  await page.waitForFunction(() => !window.__neo.play.frozen);
+  await page.keyboard.press('ArrowLeft');
+  await page.waitForTimeout(800);
+  assert.deepEqual(await page.evaluate(() => window.__hapticsLog), []);
+  await page.close();
+});

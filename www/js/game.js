@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.0';
+  const APP_VERSION = '1.3.1';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -73,9 +73,28 @@
   // Wraps a button action so a full-screen ad may play first (after a loss, capped).
   const afterLossAd = (action) => () => Ads.afterLoss().then(() => action && action());
 
+  // Vibration: the native Haptics plugin in the Android app (the browser vibration API
+  // does nothing there without extra permissions), navigator.vibrate on the web.
+  // Tests can inject window.__hapticsMock.
+  function hapticsBackend() {
+    const cap = window.Capacitor;
+    if (window.__hapticsMock) return window.__hapticsMock;
+    if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Haptics) return cap.Plugins.Haptics;
+    return null;
+  }
+
   function vibrate(ms) {
     if (!store.settings.vibration) return;
-    try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) { /* not supported */ }
+    const haptics = hapticsBackend();
+    try {
+      if (haptics) {
+        // Short ticks feel best as "impacts"; longer buzzes (falls, losses) as vibrations.
+        const done = ms <= 15 ? haptics.impact({ style: 'LIGHT' })
+          : ms <= 40 ? haptics.impact({ style: 'MEDIUM' })
+          : haptics.vibrate({ duration: ms });
+        if (done && done.catch) done.catch(() => {});
+      } else if (navigator.vibrate) navigator.vibrate(ms);
+    } catch (e) { /* not supported */ }
   }
 
   function toast(text) {
