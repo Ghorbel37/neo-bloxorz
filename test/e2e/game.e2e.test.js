@@ -506,6 +506,7 @@ test('vibration uses native haptics in the app and respects the setting', async 
     const log = (window.__hapticsLog = []);
     window.__hapticsMock = {
       impact: async (o) => { log.push(`impact:${o.style}`); },
+      notification: async (o) => { log.push(`notification:${o.type}`); },
       vibrate: async (o) => { log.push(`vibrate:${o.duration}`); },
     };
     if (!localStorage.getItem('neo-bloxorz-v1')) {
@@ -523,14 +524,16 @@ test('vibration uses native haptics in the app and respects the setting', async 
     await page.keyboard.press(key);
     await page.waitForFunction(() => !window.__neo.play.anim);
   }
-  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('vibrate:35'), 'bump vibrates');
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('impact:MEDIUM'), 'bump vibrates like Carreau (impact)');
   // A fall is a longer buzz.
   await page.click('#modal-buttons button >> nth=0');
   await page.evaluate(() => document.querySelector('[data-action=home]').click());
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=3');
   await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => window.__hapticsLog.includes('vibrate:150'));
+  await page.waitForFunction(() => window.__hapticsLog.includes('impact:HEAVY'));
+  // Only Carreau-style calls in play: never the plain one-shot vibrate.
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).every((c) => !c.startsWith('vibrate:')));
   // Turned off in Settings: nothing.
   await page.evaluate(() => { window.__neo.store().settings.vibration = false; window.__hapticsLog.length = 0; });
   await page.waitForFunction(() => !window.__neo.play.frozen);
@@ -544,33 +547,32 @@ async function hapticsPage(fail) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   await page.addInitScript((shouldFail) => {
     window.__hapticsLog = [];
-    window.__hapticsMock = {
-      vibrate: async (o) => {
-        window.__hapticsLog.push(`vibrate:${o.duration}`);
-        if (shouldFail) throw new Error('Vibrator unavailable');
-      },
+    const rec = (name, key) => async (o) => {
+      window.__hapticsLog.push(`${name}:${o[key]}`);
+      if (shouldFail) throw new Error('Vibrator unavailable');
     };
+    window.__hapticsMock = { impact: rec('impact', 'style'), notification: rec('notification', 'type'), vibrate: rec('vibrate', 'duration') };
     localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true } }));
   }, fail);
   await page.goto(URL);
   await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
   await page.click('#btn-settings');
   await page.click('text=Test vibration');
-  await page.waitForSelector('#modal-title:text("Test vibration")');
+  await page.waitForSelector('#modal-body:has-text("Which numbers did you feel")', { timeout: 10000 });
   return page;
 }
 
-test('Settings › Test vibration buzzes and reports what happened', async () => {
+test('Settings › Test vibration plays each kind, labelled, then reports', async () => {
   const page = await hapticsPage(false);
-  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('vibrate:400'));
+  assert.deepEqual(await page.evaluate(() => window.__hapticsLog), ['impact:MEDIUM', 'impact:HEAVY', 'notification:SUCCESS', 'vibrate:400']);
   const body = await page.textContent('#modal-body');
   assert.match(body, /native haptics/);
-  assert.match(body, /without errors/);
+  assert.match(body, /1\. Impact, medium \(wall bump\): sent/);
   await page.close();
 });
 
-test('Test vibration shows the error when the native call fails', async () => {
+test('Test vibration shows errors when the native calls fail', async () => {
   const page = await hapticsPage(true);
-  assert.match(await page.textContent('#modal-body'), /Error: Vibrator unavailable/);
+  assert.match(await page.textContent('#modal-body'), /error: Vibrator unavailable/);
   await page.close();
 });

@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.3';
+  const APP_VERSION = '1.3.4';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -75,63 +75,83 @@
 
   // Vibration: the native Haptics plugin in the Android app (the browser vibration API
   // does nothing there), navigator.vibrate on the web. Tests can inject window.__hapticsMock.
-  // Every buzz is a plain vibration at the phone's default strength: the plugin's "light
-  // impact" (half strength, 50 ms) is too weak to feel on many phones.
-  const BUZZ = { bump: 35, toggle: 35, win: 70, fall: 150, heart: 220, timeUp: 350 };
+  //
+  // Only the plugin's `impact` and `notification` calls are used, exactly like the Carreau
+  // app: they play short waveforms, which the phone this was tested on does feel, while the
+  // plugin's plain `vibrate({ duration })` (a one-shot pulse) did nothing there.
+  const HAPTICS = {
+    bump: ['impact', { style: 'MEDIUM' }],
+    toggle: ['impact', { style: 'MEDIUM' }],
+    win: ['notification', { type: 'SUCCESS' }],
+    fall: ['impact', { style: 'HEAVY' }],
+    heart: ['notification', { type: 'ERROR' }],
+    timeUp: ['notification', { type: 'ERROR' }],
+  };
+  const WEB_BUZZ = { bump: 25, toggle: 25, win: [20, 40, 20, 40, 60], fall: 80, heart: [40, 30, 40], timeUp: [60, 40, 60] };
 
   function hapticsBackend() {
     const cap = window.Capacitor;
     if (window.__hapticsMock) return window.__hapticsMock;
-    // Same lookup as the Carreau app, which vibrates fine on the same phone.
+    // Same lookup as the Carreau app.
     if (cap && cap.Plugins && cap.Plugins.Haptics) return cap.Plugins.Haptics;
     return null;
   }
 
-  let lastVibrationError = '';
-  // Returns a promise that resolves to null on success, or to a short error description.
-  function buzz(ms) {
+  // Plays one haptic. Resolves to null on success or to a short error description.
+  function playHaptic(fn, opts, webPattern) {
     const haptics = hapticsBackend();
     try {
       if (haptics) {
-        return Promise.resolve(haptics.vibrate({ duration: ms })).then(() => null, (e) => {
-          // Native call failed: try the browser API as a last resort, and remember why.
-          lastVibrationError = String((e && e.message) || e);
-          if (navigator.vibrate) navigator.vibrate(ms);
-          return lastVibrationError;
-        });
+        if (typeof haptics[fn] !== 'function') return Promise.resolve(`Haptics.${fn} is missing`);
+        return Promise.resolve(haptics[fn](opts)).then(() => null, (e) => String((e && e.message) || e));
       }
-      if (navigator.vibrate) return Promise.resolve(navigator.vibrate(ms) ? null : 'navigator.vibrate refused');
+      if (navigator.vibrate) return Promise.resolve(navigator.vibrate(webPattern) ? null : 'navigator.vibrate refused');
       return Promise.resolve('no vibration support');
     } catch (e) {
-      lastVibrationError = String((e && e.message) || e);
-      return Promise.resolve(lastVibrationError);
+      return Promise.resolve(String((e && e.message) || e));
     }
   }
 
   function vibrate(kind) {
     if (!store.settings.vibration) return;
-    buzz(BUZZ[kind] || 50);
+    const [fn, opts] = HAPTICS[kind] || HAPTICS.bump;
+    playHaptic(fn, opts, WEB_BUZZ[kind] || 30);
   }
 
-  // Settings › Test vibration: buzzes and reports what happened on this phone.
+  // Settings › Test vibration: plays each kind of vibration one by one, labelled on screen,
+  // then lists what happened, so a phone that ignores one kind can be pinned down.
+  const VIBRATION_TESTS = [
+    ['Impact, medium (wall bump)', 'impact', { style: 'MEDIUM' }, 40],
+    ['Impact, heavy (fall)', 'impact', { style: 'HEAVY' }, 80],
+    ['Notification, success (level solved)', 'notification', { type: 'SUCCESS' }, [20, 40, 20, 40, 60]],
+    ['Plain 0.4 s vibration', 'vibrate', { duration: 400 }, 400],
+  ];
+
   function testVibration() {
     const haptics = hapticsBackend();
-    const cap = window.Capacitor;
     const where = haptics ? 'native haptics' : navigator.vibrate ? 'browser vibration' : 'none';
-    buzz(400).then((err) => {
-      const info = [
-        `Vibration system: <b>${where}</b>`,
-        `App: ${cap && cap.isNativePlatform && cap.isNativePlatform() ? 'Android app' : 'browser'}`,
-        err ? `Error: <b>${err}</b>` : 'Request sent without errors.',
-        store.settings.vibration ? '' : 'Note: vibration is turned off in Settings.',
-      ].filter(Boolean).join('<br>');
-      modal({
-        title: 'Test vibration',
-        html: `${info}<br><br>If you felt nothing but there's no error, check that your phone isn't in silent or Do Not Disturb mode and that vibration/haptic feedback is on in the phone's settings.`,
-        buttons: [{ label: 'OK', primary: true, action: openSettings }],
-        onClose: openSettings,
+    const results = [];
+    modal({ title: 'Test vibration', html: 'Get ready…', buttons: [] });
+    const body = $('modal-body');
+    const step = (i) => {
+      if (i >= VIBRATION_TESTS.length) {
+        const list = results.map(([label, err], k) => `${k + 1}. ${label}: ${err ? `<b>error: ${err}</b>` : 'sent'}`).join('<br>');
+        modal({
+          title: 'Test vibration',
+          html: `Vibration system: <b>${where}</b><br><br>${list}<br><br>Which numbers did you feel? If none, check that the phone isn't in silent or Do Not Disturb mode.${store.settings.vibration ? '' : '<br><b>Note: vibration is turned off in Settings.</b>'}`,
+          buttons: [{ label: 'Again', action: testVibration }, { label: 'Done', primary: true, action: openSettings }],
+          onClose: openSettings,
+        });
+        return;
+      }
+      const [label, fn, opts, web] = VIBRATION_TESTS[i];
+      body.innerHTML = `<div class="big-number">${i + 1}</div>${label}`;
+      playHaptic(fn, opts, web).then((err) => {
+        results.push([label, err]);
+        setTimeout(() => step(i + 1), 1300);
       });
-    });
+    };
+    setTimeout(() => step(0), 600);
   }
 
   function toast(text) {
