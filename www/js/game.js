@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.1';
+  const APP_VERSION = '1.3.2';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -74,8 +74,11 @@
   const afterLossAd = (action) => () => Ads.afterLoss().then(() => action && action());
 
   // Vibration: the native Haptics plugin in the Android app (the browser vibration API
-  // does nothing there without extra permissions), navigator.vibrate on the web.
-  // Tests can inject window.__hapticsMock.
+  // does nothing there), navigator.vibrate on the web. Tests can inject window.__hapticsMock.
+  // Every buzz is a plain vibration at the phone's default strength: the plugin's "light
+  // impact" (half strength, 50 ms) is too weak to feel on many phones.
+  const BUZZ = { bump: 35, toggle: 35, win: 70, fall: 150, heart: 220, timeUp: 350 };
+
   function hapticsBackend() {
     const cap = window.Capacitor;
     if (window.__hapticsMock) return window.__hapticsMock;
@@ -83,18 +86,51 @@
     return null;
   }
 
-  function vibrate(ms) {
-    if (!store.settings.vibration) return;
+  let lastVibrationError = '';
+  // Returns a promise that resolves to null on success, or to a short error description.
+  function buzz(ms) {
     const haptics = hapticsBackend();
     try {
       if (haptics) {
-        // Short ticks feel best as "impacts"; longer buzzes (falls, losses) as vibrations.
-        const done = ms <= 15 ? haptics.impact({ style: 'LIGHT' })
-          : ms <= 40 ? haptics.impact({ style: 'MEDIUM' })
-          : haptics.vibrate({ duration: ms });
-        if (done && done.catch) done.catch(() => {});
-      } else if (navigator.vibrate) navigator.vibrate(ms);
-    } catch (e) { /* not supported */ }
+        return Promise.resolve(haptics.vibrate({ duration: ms })).then(() => null, (e) => {
+          // Native call failed: try the browser API as a last resort, and remember why.
+          lastVibrationError = String((e && e.message) || e);
+          if (navigator.vibrate) navigator.vibrate(ms);
+          return lastVibrationError;
+        });
+      }
+      if (navigator.vibrate) return Promise.resolve(navigator.vibrate(ms) ? null : 'navigator.vibrate refused');
+      return Promise.resolve('no vibration support');
+    } catch (e) {
+      lastVibrationError = String((e && e.message) || e);
+      return Promise.resolve(lastVibrationError);
+    }
+  }
+
+  function vibrate(kind) {
+    if (!store.settings.vibration) return;
+    buzz(BUZZ[kind] || 50);
+  }
+
+  // Settings › Test vibration: buzzes and reports what happened on this phone.
+  function testVibration() {
+    const haptics = hapticsBackend();
+    const cap = window.Capacitor;
+    const where = haptics ? 'native haptics' : navigator.vibrate ? 'browser vibration' : 'none';
+    buzz(400).then((err) => {
+      const info = [
+        `Vibration system: <b>${where}</b>`,
+        `App: ${cap && cap.isNativePlatform && cap.isNativePlatform() ? 'Android app' : 'browser'}`,
+        err ? `Error: <b>${err}</b>` : 'Request sent without errors.',
+        store.settings.vibration ? '' : 'Note: vibration is turned off in Settings.',
+      ].filter(Boolean).join('<br>');
+      modal({
+        title: 'Test vibration',
+        html: `${info}<br><br>If you felt nothing but there's no error, check that your phone isn't in silent or Do Not Disturb mode and that vibration/haptic feedback is on in the phone's settings.`,
+        buttons: [{ label: 'OK', primary: true, action: openSettings }],
+        onClose: openSettings,
+      });
+    });
   }
 
   function toast(text) {
@@ -448,7 +484,7 @@
         rewind();
       } else if (res === 'retry') {
         Sound.lose();
-        vibrate(120);
+        vibrate('heart');
         toast({ fall: '−1 ♥  You fell', moves: '−1 ♥  Out of moves', restart: '−1 ♥  Restarted' }[kind]);
         setTimeout(() => resetLevel(), 300);
       } else {
@@ -537,7 +573,7 @@
           over = true;
           play.frozen = true;
           Sound.lose();
-          vibrate(200);
+          vibrate('timeUp');
           if (Ads.available() && !extended) offerMoreTime();
           else endRush();
         }
@@ -759,7 +795,7 @@
       const hit = Engine.cellsOf(Engine.roll(from, dir)).filter(([x, y]) => tileAt(play.level, from.open, x, y) === 'X');
       play.flash = { cells: new Set(hit.map(([x, y]) => `${x},${y}`)), at: performance.now() };
       Sound.bump();
-      vibrate(10);
+      vibrate('bump');
     }
     play.history.push(from);
     play.moves++;
@@ -773,13 +809,13 @@
       r.broke.forEach(([x, y]) => play.broken.add(`${x},${y}`));
       if (r.broke.length) { Sound.shatter(); spawnShards(r.broke); }
       Sound.fall();
-      vibrate(80);
+      vibrate('fall');
       animate(from, r.state, 'fall', () => session.onFall());
     } else if (r.outcome === 'win') {
       play.frozen = true;
       play.state = r.state;
       Sound.win();
-      vibrate(30);
+      vibrate('win');
       animate(from, r.state, 'win', () => {
         spawnBurst(r.state);
         session.onWin(play.moves);
@@ -787,7 +823,7 @@
     } else {
       play.state = r.state;
       Sound.move(shapeIndex(r.state.w, r.state.h));
-      if (r.toggled) { Sound.toggle(); vibrate(15); }
+      if (r.toggled) { Sound.toggle(); vibrate('toggle'); }
       // Levels always start solvable, but a move (like a switch flipped at the wrong
       // time) can leave no way to the goal: say so instead of letting the player wander.
       if (!solve(play.level, play.state)) toast('No way to the goal from here — undo or restart');
@@ -1190,6 +1226,10 @@
       });
     });
     node.appendChild(reset);
+    const testVib = document.createElement('button');
+    testVib.textContent = 'Test vibration';
+    testVib.addEventListener('click', testVibration);
+    node.appendChild(testVib);
     const removeAds = document.createElement('button');
     removeAds.textContent = store.adsRemoved ? 'Ads removed ✓' : 'Remove ads';
     removeAds.disabled = store.adsRemoved;

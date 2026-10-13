@@ -523,19 +523,54 @@ test('vibration uses native haptics in the app and respects the setting', async 
     await page.keyboard.press(key);
     await page.waitForFunction(() => !window.__neo.play.anim);
   }
-  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('impact:LIGHT'), 'bump vibrates');
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('vibrate:35'), 'bump vibrates');
   // A fall is a longer buzz.
   await page.click('#modal-buttons button >> nth=0');
   await page.evaluate(() => document.querySelector('[data-action=home]').click());
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=3');
   await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => window.__hapticsLog.includes('vibrate:80'));
+  await page.waitForFunction(() => window.__hapticsLog.includes('vibrate:150'));
   // Turned off in Settings: nothing.
   await page.evaluate(() => { window.__neo.store().settings.vibration = false; window.__hapticsLog.length = 0; });
   await page.waitForFunction(() => !window.__neo.play.frozen);
   await page.keyboard.press('ArrowLeft');
   await page.waitForTimeout(800);
   assert.deepEqual(await page.evaluate(() => window.__hapticsLog), []);
+  await page.close();
+});
+
+async function hapticsPage(fail) {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  await page.addInitScript((shouldFail) => {
+    window.__hapticsLog = [];
+    window.__hapticsMock = {
+      vibrate: async (o) => {
+        window.__hapticsLog.push(`vibrate:${o.duration}`);
+        if (shouldFail) throw new Error('Vibrator unavailable');
+      },
+    };
+    localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true } }));
+  }, fail);
+  await page.goto(URL);
+  await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+  await page.click('#btn-settings');
+  await page.click('text=Test vibration');
+  await page.waitForSelector('#modal-title:text("Test vibration")');
+  return page;
+}
+
+test('Settings › Test vibration buzzes and reports what happened', async () => {
+  const page = await hapticsPage(false);
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('vibrate:400'));
+  const body = await page.textContent('#modal-body');
+  assert.match(body, /native haptics/);
+  assert.match(body, /without errors/);
+  await page.close();
+});
+
+test('Test vibration shows the error when the native call fails', async () => {
+  const page = await hapticsPage(true);
+  assert.match(await page.textContent('#modal-body'), /Error: Vibrator unavailable/);
   await page.close();
 });
