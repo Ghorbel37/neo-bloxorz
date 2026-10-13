@@ -524,16 +524,17 @@ test('vibration uses native haptics in the app and respects the setting', async 
     await page.keyboard.press(key);
     await page.waitForFunction(() => !window.__neo.play.anim);
   }
-  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('impact:MEDIUM'), 'bump vibrates like Carreau (impact)');
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('notification:ERROR'), 'bump vibrates with a multi-part pattern');
   // A fall is a longer buzz.
   await page.click('#modal-buttons button >> nth=0');
   await page.evaluate(() => document.querySelector('[data-action=home]').click());
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=3');
   await page.keyboard.press('ArrowLeft');
-  await page.waitForFunction(() => window.__hapticsLog.includes('impact:HEAVY'));
-  // Only Carreau-style calls in play: never the plain one-shot vibrate.
-  assert.ok((await page.evaluate(() => window.__hapticsLog)).every((c) => !c.startsWith('vibrate:')));
+  await page.waitForFunction(() => window.__hapticsLog.includes('notification:WARNING'));
+  // Only multi-part notification patterns in play: impacts and one-shot vibrations count as
+  // touch feedback, which phones with touch feedback off drop.
+  assert.ok((await page.evaluate(() => window.__hapticsLog)).every((c) => c.startsWith('notification:')));
   // Turned off in Settings: nothing.
   await page.evaluate(() => { window.__neo.store().settings.vibration = false; window.__hapticsLog.length = 0; });
   await page.waitForFunction(() => !window.__neo.play.frozen);
@@ -564,10 +565,10 @@ async function hapticsPage(fail) {
 
 test('Settings › Test vibration plays each kind, labelled, then reports', async () => {
   const page = await hapticsPage(false);
-  assert.deepEqual(await page.evaluate(() => window.__hapticsLog), ['impact:MEDIUM', 'impact:HEAVY', 'notification:SUCCESS', 'vibrate:400']);
+  assert.deepEqual(await page.evaluate(() => window.__hapticsLog), ['notification:ERROR', 'notification:WARNING', 'notification:SUCCESS', 'impact:HEAVY']);
   const body = await page.textContent('#modal-body');
   assert.match(body, /native haptics/);
-  assert.match(body, /1\. Impact, medium \(wall bump\): sent/);
+  assert.match(body, /1\. Wall bump \(double tap\): sent/);
   await page.close();
 });
 

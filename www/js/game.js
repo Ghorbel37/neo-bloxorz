@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.4';
+  const APP_VERSION = '1.3.5';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -76,16 +76,18 @@
   // Vibration: the native Haptics plugin in the Android app (the browser vibration API
   // does nothing there), navigator.vibrate on the web. Tests can inject window.__hapticsMock.
   //
-  // Only the plugin's `impact` and `notification` calls are used, exactly like the Carreau
-  // app: they play short waveforms, which the phone this was tested on does feel, while the
-  // plugin's plain `vibrate({ duration })` (a one-shot pulse) did nothing there.
+  // Only the plugin's multi-pulse `notification` patterns are used. Android treats any
+  // vibration under 1 s with at most 3 parts as *touch feedback*, which phones with touch
+  // feedback turned off silently drop: that is why `impact` (2 parts) and a plain
+  // `vibrate` (1 part) did nothing on the test phone while the success pattern (4 parts)
+  // was felt. The notification patterns have 4-6 parts, so they play as normal vibrations.
   const HAPTICS = {
-    bump: ['impact', { style: 'MEDIUM' }],
-    toggle: ['impact', { style: 'MEDIUM' }],
+    bump: ['notification', { type: 'ERROR' }], // quick double tap (4 parts)
+    toggle: ['notification', { type: 'SUCCESS' }], // 4 parts
     win: ['notification', { type: 'SUCCESS' }],
-    fall: ['impact', { style: 'HEAVY' }],
-    heart: ['notification', { type: 'ERROR' }],
-    timeUp: ['notification', { type: 'ERROR' }],
+    fall: ['notification', { type: 'WARNING' }], // longest pattern (6 parts)
+    heart: ['notification', { type: 'WARNING' }],
+    timeUp: ['notification', { type: 'WARNING' }],
   };
   const WEB_BUZZ = { bump: 25, toggle: 25, win: [20, 40, 20, 40, 60], fall: 80, heart: [40, 30, 40], timeUp: [60, 40, 60] };
 
@@ -121,10 +123,10 @@
   // Settings › Test vibration: plays each kind of vibration one by one, labelled on screen,
   // then lists what happened, so a phone that ignores one kind can be pinned down.
   const VIBRATION_TESTS = [
-    ['Impact, medium (wall bump)', 'impact', { style: 'MEDIUM' }, 40],
-    ['Impact, heavy (fall)', 'impact', { style: 'HEAVY' }, 80],
-    ['Notification, success (level solved)', 'notification', { type: 'SUCCESS' }, [20, 40, 20, 40, 60]],
-    ['Plain 0.4 s vibration', 'vibrate', { duration: 400 }, 400],
+    ['Wall bump (double tap)', 'notification', { type: 'ERROR' }, [25, 40, 45]],
+    ['Fall / lost heart (long pattern)', 'notification', { type: 'WARNING' }, [30, 40, 30, 50, 60]],
+    ['Level solved', 'notification', { type: 'SUCCESS' }, [35, 65, 21]],
+    ['Touch-feedback style tap (off on some phones)', 'impact', { style: 'HEAVY' }, 60],
   ];
 
   function testVibration() {
