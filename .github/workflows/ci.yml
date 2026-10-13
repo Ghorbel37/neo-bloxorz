@@ -74,6 +74,10 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      # Updates only install over the previous version when the key never changes.
+      - name: Check the APK is signed with the fixed test key
+        run: python3 tools/check-apk-signature.py android/app/build/outputs/apk/debug/app-debug.apk android/app/neo-bloxorz-test.keystore neo-bloxorz-test neobloxorz
+
       # Signed release builds need the upload key in GitHub secrets (see docs/PLAY_STORE.md).
       - name: Decode upload key
         id: key

@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.2';
+  const APP_VERSION = '1.3.3';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -82,7 +82,8 @@
   function hapticsBackend() {
     const cap = window.Capacitor;
     if (window.__hapticsMock) return window.__hapticsMock;
-    if (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Haptics) return cap.Plugins.Haptics;
+    // Same lookup as the Carreau app, which vibrates fine on the same phone.
+    if (cap && cap.Plugins && cap.Plugins.Haptics) return cap.Plugins.Haptics;
     return null;
   }
 
