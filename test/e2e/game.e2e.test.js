@@ -162,8 +162,12 @@ test('campaign: solve level 1 with swipes and get 3 stars', async () => {
   await shot(page, 'level1-solved');
   const store = await page.evaluate(() => window.__neo.store());
   assert.equal(store.campaign['The Sketch'], 6);
-  // Progress survives a reload, and level 2 is unlocked.
+  // Progress survives a reload, and level 2 is unlocked. Wait for the save to be in
+  // storage first: Chromium can drop a write made to a file:// page just before reloading.
+  await page.waitForFunction(() => JSON.parse(localStorage.getItem('neo-bloxorz-v1')).campaign['The Sketch'] === 6);
+  await page.waitForTimeout(300);
   await page.reload();
+  await page.waitForFunction(() => window.__neo && window.__neo.store().campaign['The Sketch'] === 6);
   await page.click('#modes .mode >> nth=0');
   assert.equal(await page.locator('.world-grid button >> nth=1').isDisabled(), false);
   assert.equal(await page.locator('.world-grid button >> nth=2').isDisabled(), true);
