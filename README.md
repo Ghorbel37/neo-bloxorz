@@ -2,7 +2,7 @@
 
 A 2D mobile puzzle game by **Ghorbel Games** about a block that changes shape every time it moves.
 
-Play it in the browser: https://ghorbel37.github.io/neo-bloxorz/ (once GitHub Pages is enabled, see below).
+**Play it in the browser:** <https://ghorbel37.github.io/neo-bloxorz/>
 
 The block starts as a **small square** in the bottom-left corner:
 
@@ -40,12 +40,6 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 
 Because every move toggles the shape, the board is a grid of slots that alternate thin and
 thick, and each slot only fits one shape.
-
-### Tiles
-- **Glass** `!` cracks under the big square.
-- **Switch** `o` flips every bridge each time the block lands on it.
-- **Heavy switch** `O` only clicks under the big square.
-- **Bridges**: `=` starts closed, `+` starts open.
 
 ## Controls
 Swipe on the board, use the on-screen pad, or press the arrow keys/WASD. `U` undoes, `R` restarts, `H` shows a hint.
