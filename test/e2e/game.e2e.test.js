@@ -24,12 +24,18 @@ test.after(async () => { if (browser) await browser.close(); });
 // `cleared` marks that many campaign levels as solved so later ones are unlocked.
 // `ads` installs a fake AdMob backend that records calls in window.__adsLog.
 // `app` loads the Android build instead of the web one.
-async function newPage({ fresh = false, cleared = 0, ads = false, brand = false, app = false } = {}) {
+// `saved` is a stored game (as in localStorage) to start from. All saved data is put in place
+// before the page loads: writing storage and then reloading is unreliable for file:// pages.
+async function newPage({ fresh = false, cleared = 0, ads = false, brand = false, app = false, saved = null } = {}) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  if (!fresh) {
+  if (saved) {
+    await page.addInitScript((data) => {
+      if (!localStorage.getItem('neo-bloxorz-v1')) localStorage.setItem('neo-bloxorz-v1', JSON.stringify(data));
+    }, saved);
+  } else if (!fresh) {
     await page.addInitScript((names) => {
       if (localStorage.getItem('neo-bloxorz-v1')) return;
       const campaign = {};
@@ -312,14 +318,7 @@ test('daily: solve today\'s puzzle and start a streak', async () => {
 });
 
 test('precision: going over the move limit fails the level', async () => {
-  const page = await newPage();
-  await dismissIntro(page);
-  await page.evaluate(() => {
-    const s = window.__neo.store();
-    s.campaign['The Sketch'] = 6;
-    localStorage.setItem('neo-bloxorz-v1', JSON.stringify(s));
-  });
-  await page.reload();
+  const page = await newPage({ cleared: 1 });
   await page.click('#modes .mode >> nth=4');
   await page.click('.world-grid button >> nth=0');
   assert.equal(await page.isVisible('#btn-undo'), false);
@@ -402,11 +401,9 @@ test('walking into a dead end tells the player', async () => {
 });
 
 test('progress saved by 1.1 is kept, mapped to the same levels by name', async () => {
-  const page = await newPage({ fresh: true });
-  await page.evaluate(() => localStorage.setItem('neo-bloxorz-v1', JSON.stringify({
+  const page = await newPage({ saved: {
     version: 2, seenIntro: { howto: true }, campaign: { 0: 6, 2: 4, 9: 12 }, hinted: { 9: true }, rushBest: 7,
-  })));
-  await page.reload();
+  } });
   const store = await page.evaluate(() => window.__neo.store());
   assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, 'Thin Ice': 12 });
   assert.deepEqual(store.hinted, { 'Thin Ice': true });
@@ -607,40 +604,6 @@ test('vibration uses native haptics in the app and respects the setting', async 
   await page.keyboard.press('ArrowLeft');
   await page.waitForTimeout(800);
   assert.deepEqual(await page.evaluate(() => window.__hapticsLog), []);
-  await page.close();
-});
-
-async function hapticsPage(fail) {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await page.addInitScript((shouldFail) => {
-    window.__hapticsLog = [];
-    const rec = (name, key) => async (o) => {
-      window.__hapticsLog.push(`${name}:${o[key]}`);
-      if (shouldFail) throw new Error('Vibrator unavailable');
-    };
-    window.__hapticsMock = { impact: rec('impact', 'style'), notification: rec('notification', 'type'), vibrate: rec('vibrate', 'duration') };
-    localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true } }));
-  }, fail);
-  await page.goto(URL);
-  await page.evaluate(() => { const b = document.getElementById('brand'); if (b) { b.classList.add('out'); b.hidden = true; } });
-  await page.click('#btn-settings');
-  await page.click('text=Test vibration');
-  await page.waitForSelector('#modal-body:has-text("Which numbers did you feel")', { timeout: 10000 });
-  return page;
-}
-
-test('Settings › Test vibration plays each kind, labelled, then reports', async () => {
-  const page = await hapticsPage(false);
-  assert.deepEqual(await page.evaluate(() => window.__hapticsLog), ['notification:ERROR', 'notification:WARNING', 'notification:SUCCESS', 'impact:HEAVY']);
-  const body = await page.textContent('#modal-body');
-  assert.match(body, /native haptics/);
-  assert.match(body, /1\. Wall bump \(double tap\): sent/);
-  await page.close();
-});
-
-test('Test vibration shows errors when the native calls fail', async () => {
-  const page = await hapticsPage(true);
-  assert.match(await page.textContent('#modal-body'), /error: Vibrator unavailable/);
   await page.close();
 });
 

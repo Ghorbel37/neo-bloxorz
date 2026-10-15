@@ -120,42 +120,6 @@
     playHaptic(fn, opts, WEB_BUZZ[kind] || 30);
   }
 
-  // Settings › Test vibration: plays each kind of vibration one by one, labelled on screen,
-  // then lists what happened, so a phone that ignores one kind can be pinned down.
-  const VIBRATION_TESTS = [
-    ['Wall bump (double tap)', 'notification', { type: 'ERROR' }, [25, 40, 45]],
-    ['Fall / lost heart (long pattern)', 'notification', { type: 'WARNING' }, [30, 40, 30, 50, 60]],
-    ['Level solved', 'notification', { type: 'SUCCESS' }, [35, 65, 21]],
-    ['Touch-feedback style tap (off on some phones)', 'impact', { style: 'HEAVY' }, 60],
-  ];
-
-  function testVibration() {
-    const haptics = hapticsBackend();
-    const where = haptics ? 'native haptics' : navigator.vibrate ? 'browser vibration' : 'none';
-    const results = [];
-    modal({ title: 'Test vibration', html: 'Get ready…', buttons: [] });
-    const body = $('modal-body');
-    const step = (i) => {
-      if (i >= VIBRATION_TESTS.length) {
-        const list = results.map(([label, err], k) => `${k + 1}. ${label}: ${err ? `<b>error: ${err}</b>` : 'sent'}`).join('<br>');
-        modal({
-          title: 'Test vibration',
-          html: `Vibration system: <b>${where}</b><br><br>${list}<br><br>Which numbers did you feel? If none, check that the phone isn't in silent or Do Not Disturb mode.${store.settings.vibration ? '' : '<br><b>Note: vibration is turned off in Settings.</b>'}`,
-          buttons: [{ label: 'Again', action: testVibration }, { label: 'Done', primary: true, action: openSettings }],
-          onClose: openSettings,
-        });
-        return;
-      }
-      const [label, fn, opts, web] = VIBRATION_TESTS[i];
-      body.innerHTML = `<div class="big-number">${i + 1}</div>${label}`;
-      playHaptic(fn, opts, web).then((err) => {
-        results.push([label, err]);
-        setTimeout(() => step(i + 1), 1300);
-      });
-    };
-    setTimeout(() => step(0), 600);
-  }
-
   function toast(text) {
     const t = $('toast');
     t.hidden = true;
@@ -1313,10 +1277,6 @@
     replay.textContent = 'Replay tutorial';
     replay.addEventListener('click', () => startSession(tutorialSession(0, false)));
     node.appendChild(replay);
-    const testVib = document.createElement('button');
-    testVib.textContent = 'Test vibration';
-    testVib.addEventListener('click', testVibration);
-    node.appendChild(testVib);
     if (PLATFORM.ads) {
       const removeAds = document.createElement('button');
       removeAds.textContent = store.adsRemoved ? 'Ads removed ✓' : 'Remove ads';
