@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.5.0';
+  const APP_VERSION = '1.5.1';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
