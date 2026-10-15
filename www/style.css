@@ -198,3 +198,4 @@ button.icon { width: 46px; height: 46px; padding: 0; font-size: 24px; flex: none
 /* No on-screen arrows (the app, or turned off): tool buttons in one row across the bottom. */
 .pad.no-dpad .tools { flex-direction: row; width: 100%; }
 .pad.no-dpad .tools button { flex: 1; min-width: 0; height: 52px; }
+.coach-dots[hidden] { display: none; }

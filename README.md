@@ -29,9 +29,11 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 - **Bridges**: `=` starts closed, `+` starts open.
 
 ## Modes
-- **Campaign**: 36 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
-  Every mechanic is introduced by a short coached tutorial level (guided swipes, highlighted
-  tiles) right before it is needed; the game opens straight into the first one.
+- **Tutorial**: plays on first launch and can be replayed from Settings. Three guided stages
+  teach rolling, bumping walls and the rhythm idea; you can skip it at any time.
+- **Campaign**: 34 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
+  Levels never restrict your moves: the first level to use a new tile explains it in a note and
+  highlights it.
 - **Descent**: a roguelike run through endless generated floors. 3 hearts, a move budget per floor,
   and a perk to pick after each floor (Extra Heart, Rewind, Stamina, Ghost, Compass, Warp).
 - **Rush**: time attack. 90 seconds, each solve buys more time, puzzles get harder.
@@ -60,7 +62,7 @@ Step-by-step guide: [docs/PLAY_STORE.md](docs/PLAY_STORE.md). Listing text and g
 ## Project layout
 - `www/` — the game (plain HTML/CSS/JS, no build step)
   - `js/engine.js` — rules and a breadth-first solver (shared with node)
-  - `js/levels.js` — campaign level maps (see the legend at the top of the file)
+  - `js/levels.js` — campaign level maps and the tutorial stages (see the notes at the top of the file)
   - `js/generator.js` — seeded procedural puzzles for Descent, Rush and Daily. The goal is
     placed on a position the solver reached, every level is re-solved on its final map, and a
     level is only kept if it needs wall bumps (`Engine.minBumps`). `generateSafe` retries with

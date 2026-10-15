@@ -87,6 +87,25 @@ async function playSolution(page) {
   }
 }
 
+// Shortest list of moves from the start that ends with a wall bump.
+function pathToBump(def) {
+  const level = Engine.parseLevel(def);
+  const queue = [[Engine.initialState(level), []]];
+  const seen = new Set([Engine.stateKey(queue[0][0])]);
+  while (queue.length) {
+    const [s, path] = queue.shift();
+    for (const dir of Object.keys(Engine.DIRS)) {
+      const r = Engine.move(level, s, dir);
+      if (r.outcome !== 'ok') continue;
+      if (r.bumped) return [...path, dir];
+      if (seen.has(Engine.stateKey(r.state))) continue;
+      seen.add(Engine.stateKey(r.state));
+      queue.push([r.state, [...path, dir]]);
+    }
+  }
+  throw new Error(`no bump in ${def.name}`);
+}
+
 async function dismissIntro(page) {
   if (await page.isVisible('#modal')) await page.click('#modal-buttons .primary');
 }
@@ -94,6 +113,8 @@ async function dismissIntro(page) {
 test('first launch starts the coached tutorial', async () => {
   const page = await newPage({ fresh: true });
   assert.ok(await page.isVisible('#game'));
+  assert.equal(await page.evaluate(() => window.__neo.session.kind), 'tutorial');
+  assert.match(await page.textContent('#level-name'), /Tutorial · 1\/3/);
   assert.ok(await page.isVisible('#coach'));
   assert.match(await page.textContent('#coach-text'), /Swipe right/);
   assert.ok(await page.locator('.dpad [data-dir=right]').evaluate((b) => b.classList.contains('coach-pulse')));
@@ -120,16 +141,49 @@ test('home screen lists 5 modes and how to play', async () => {
   assert.deepEqual(page.errors, []);
 });
 
-test('tutorial levels coach each mechanic', async () => {
+test('the tutorial plays through its stages, then leads to the campaign', async () => {
+  const page = await newPage({ fresh: true });
+  for (let stage = 1; stage <= LEVELS.TUTORIAL.length; stage++) {
+    await page.waitForFunction((n) => document.getElementById('level-name').textContent.includes(`${n}/`), stage);
+    await shot(page, `tutorial-stage-${stage}`);
+    await playSolution(page);
+  }
+  await page.waitForSelector('#modal-title:text("Tutorial complete")');
+  assert.equal(await page.evaluate(() => window.__neo.store().seenIntro.tutorial), true);
+  await page.click('#modal-buttons .primary');
+  assert.equal(await page.textContent('#level-name'), '1. The Sketch');
+  assert.deepEqual(page.errors, []);
+});
+
+test('Settings › Replay tutorial, and it can be skipped', async () => {
+  const page = await newPage({ cleared: 5 });
+  await page.click('#btn-settings');
+  await page.click('text=Replay tutorial');
+  assert.equal(await page.evaluate(() => window.__neo.session.kind), 'tutorial');
+  assert.match(await page.textContent('#coach-text'), /Swipe right/);
+  await page.click('#btn-quit');
+  assert.equal(await page.textContent('#modal-title'), 'Skip the tutorial?');
+  await page.click('#modal-buttons .primary');
+  assert.ok(await page.isVisible('#home'), 'a replay goes back home when skipped');
+  assert.deepEqual(page.errors, []);
+});
+
+test('levels that introduce a mechanic explain it without restricting moves', async () => {
   const page = await newPage({ cleared: LEVELS.length });
-  for (const name of ['Out of Step', 'Glass', 'Switch']) {
+  for (const name of ['Glass', 'Switch']) {
     const i = LEVELS.findIndex((l) => l.name === name);
     await page.evaluate(() => document.querySelector('[data-action=home]').click());
     await page.click('#modes .mode >> nth=0');
     await page.click(`.world-grid button[aria-label^="Level ${i + 1}:"]`);
-    assert.ok(await page.isVisible('#coach'), `${name} shows the coach`);
+    assert.ok(await page.isVisible('#coach'), `${name} shows its note`);
     assert.ok((await page.evaluate(() => window.__neo.play.marks.length)) > 0, `${name} highlights tiles`);
-    await shot(page, `tutorial-${name.toLowerCase().replace(/ /g, '-')}`);
+    await shot(page, `intro-${name.toLowerCase()}`);
+    // Any swipe that doesn't fall is accepted (the old guided steps only took one).
+    const dir = await page.evaluate(() => Object.keys(Engine.DIRS).find((d) => Engine.move(window.__neo.play.level, window.__neo.play.state, d).outcome === 'ok'));
+    await page.keyboard.press(KEY[dir]);
+    await page.waitForFunction(() => window.__neo.play.moves === 1);
+    assert.equal(await page.isVisible('#coach'), false, 'the note leaves the board after the first move');
+    assert.equal(await page.textContent('#hint'), LEVELS[i].intro.say, 'and stays on the hint line');
     await playSolution(page);
     await page.waitForSelector('#modal:not([hidden])');
     assert.equal(await page.textContent('#modal-title'), 'Solved!');
@@ -524,18 +578,16 @@ test('vibration uses native haptics in the app and respects the setting', async 
   }, LEVELS.slice(0, 4).map((l) => l.name));
   await page.goto(URL);
   await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
-  // "Bump" tutorial: the second swipe bumps the wall (a light tick).
+  // Level 2: walk the shortest route to a wall bump.
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=1');
-  for (const key of ['ArrowRight', 'ArrowRight']) {
-    await page.keyboard.press(key);
+  for (const dir of pathToBump(LEVELS[1])) {
+    await page.keyboard.press(KEY[dir]);
     await page.waitForFunction(() => !window.__neo.play.anim);
   }
   assert.ok((await page.evaluate(() => window.__hapticsLog)).includes('notification:ERROR'), 'bump vibrates with a multi-part pattern');
   // A fall is a longer buzz.
-  await page.click('#modal-buttons button >> nth=0');
-  await page.evaluate(() => document.querySelector('[data-action=home]').click());
-  await page.click('#modes .mode >> nth=0');
+  await page.click('#btn-quit'); // back to the level list
   await page.click('.world-grid button >> nth=3');
   await page.keyboard.press('ArrowLeft');
   await page.waitForFunction(() => window.__hapticsLog.includes('notification:WARNING'));

@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.4.0';
+  const APP_VERSION = '1.5.0';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -345,8 +345,9 @@
     return {
       kind: precision ? 'precision' : 'campaign',
       title: `${i + 1}. ${LEVELS[i].name}`,
-      hintText: precision ? `Solve in ${limit} moves or fewer.` : LEVELS[i].hint || '',
-      tutorial: precision ? null : LEVELS[i].tutorial || null,
+      // A level that introduces a mechanic shows its note (and keeps it on the hint line).
+      hintText: precision ? `Solve in ${limit} moves or fewer.` : (LEVELS[i].intro && LEVELS[i].intro.say) || LEVELS[i].hint || '',
+      intro: precision ? null : LEVELS[i].intro || null,
       level: campaign[i],
       limit: precision ? () => limit : null,
       canUndo: () => !precision,
@@ -394,6 +395,55 @@
           html,
           buttons: [{ label: 'Replay', action: retry }, { label: 'Next', primary: true, action: next }],
           onClose: next,
+        });
+      },
+    };
+  }
+
+  // The tutorial: separate from the campaign, plays on first launch and from Settings.
+  function tutorialSession(stage, firstTime) {
+    const def = TUTORIAL[stage];
+    const finish = () => {
+      store.seenIntro.tutorial = true;
+      save();
+    };
+    return {
+      kind: 'tutorial',
+      title: `Tutorial · ${stage + 1}/${TUTORIAL.length} · ${def.name}`,
+      hintText: '',
+      coachSteps: def.steps,
+      level: parseLevel({ name: def.name, map: def.map }),
+      limit: null,
+      canUndo: () => true,
+      canHint: () => false,
+      stats: () => `Moves ${play.moves}`,
+      chips: () => [],
+      quit() {
+        modal({
+          title: 'Skip the tutorial?',
+          html: 'You can replay it any time from Settings.',
+          buttons: [
+            { label: 'Keep going' },
+            { label: 'Skip', primary: true, action: () => { finish(); if (firstTime) startSession(campaignSession(0, false)); else showHome(); } },
+          ],
+          onClose: () => {},
+        });
+      },
+      onFall() { toast('Fell! Try again'); setTimeout(() => resetLevel(), 250); },
+      onWin() {
+        if (stage + 1 < TUTORIAL.length) {
+          toast('Nice!');
+          setTimeout(() => startSession(tutorialSession(stage + 1, firstTime)), 600);
+          return;
+        }
+        finish();
+        modal({
+          title: 'Tutorial complete',
+          html: "You know how to roll and bump. Levels will explain each new tile when it first appears.<br><br>You can replay the tutorial from Settings.",
+          buttons: firstTime
+            ? [{ label: 'Play the campaign', primary: true, action: () => startSession(campaignSession(0, false)) }]
+            : [{ label: 'Home', action: showHome }, { label: 'Campaign', primary: true, action: () => openLevels('campaign') }],
+          onClose: firstTime ? () => startSession(campaignSession(0, false)) : showHome,
         });
       },
     };
@@ -701,7 +751,10 @@
     Object.assign(play, {
       level, state: initialState(level), history: [], moves: 0, anim: null, queued: null,
       broken: new Set(), frozen: false, hint: null,
-      coach: session.tutorial ? { steps: session.tutorial, i: 0 } : null,
+      // Tutorial stages are coached step by step; a level intro is a single note that
+      // never limits moves and moves to the hint line after the first move.
+      coach: session.coachSteps ? { steps: session.coachSteps, i: 0 }
+        : session.intro ? { steps: [session.intro], i: 0, note: true } : null,
     });
     $('level-name').textContent = session.title;
     renderCoach();
@@ -710,8 +763,9 @@
   }
 
   // ---------- Tutorial coach ----------
-  // Tutorial steps are a run of guided swipes (`dir`) followed by free play. Guided steps
-  // only accept the expected swipe; marked tiles pulse on the board.
+  // Tutorial stages are a run of guided swipes (`dir`) followed by free play. Guided steps
+  // only accept the expected swipe; marked tiles pulse on the board. Campaign levels only
+  // ever get a note (no `dir`), so they never restrict the player.
   function coachStep() {
     const c = play.coach;
     return c && c.i < c.steps.length ? c.steps[c.i] : null;
@@ -722,7 +776,7 @@
     if (Array.isArray(mark)) return mark;
     const level = play.level;
     if (mark === 'goal') return level.goal ? Engine.cellsOf(level.goal) : [];
-    const chars = { glass: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
+    const chars = { walls: 'X', glass: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
     const out = [];
     level.tiles.forEach((row, y) => row.forEach((t, x) => { if (chars.includes(t)) out.push([x, y]); }));
     return out;
@@ -740,6 +794,7 @@
     }
     $('coach-text').textContent = step.say;
     const dots = $('coach-dots');
+    dots.hidden = play.coach.steps.length < 2;
     dots.innerHTML = play.coach.steps.map((_, k) => `<span class="${k <= play.coach.i ? 'on' : ''}"></span>`).join('');
     box.hidden = false;
     $('hint').hidden = true;
@@ -827,6 +882,9 @@
     play.hint = null;
     if (step && step.dir && r.outcome !== 'fall') {
       play.coach.i++;
+      renderCoach();
+    } else if (step && play.coach.note && r.outcome !== 'fall') {
+      play.coach.i = play.coach.steps.length; // the note stays on the hint line
       renderCoach();
     }
     if (r.outcome === 'fall') {
@@ -1251,6 +1309,10 @@
       });
     });
     node.appendChild(reset);
+    const replay = document.createElement('button');
+    replay.textContent = 'Replay tutorial';
+    replay.addEventListener('click', () => startSession(tutorialSession(0, false)));
+    node.appendChild(replay);
     const testVib = document.createElement('button');
     testVib.textContent = 'Test vibration';
     testVib.addEventListener('click', testVibration);
@@ -1366,12 +1428,12 @@
   if (PLATFORM.ads) Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
   showHome();
   if (!store.seenIntro.howto) {
-    // First launch: learn by playing, straight into the first tutorial level.
+    // First launch: learn by playing, straight into the tutorial.
     store.seenIntro.howto = true;
     save();
-    if (!cleared(0)) startSession(campaignSession(0, false));
+    if (!cleared(0)) startSession(tutorialSession(0, true));
   }
 
   // Exposed for automated tests.
-  window.__neo = { setAdsRemoved, play, get session() { return session; }, store: () => store, tryMove, campaignPars, coachStep };
+  window.__neo = { setAdsRemoved, play, get session() { return session; }, store: () => store, tryMove, campaignPars, coachStep, startTutorial: () => startSession(tutorialSession(0, false)) };
 })();

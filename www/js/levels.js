@@ -3,23 +3,19 @@
 //   a b c d  shape tiles (small / horizontal / vertical / big only)
 //   o switch   O heavy switch (big square only)   = bridge (closed)   + bridge (open)
 // The S cells give the starting shape, the G cells the shape needed to finish.
-// Levels with a `tutorial` introduce a mechanic with coached steps (boards found with
-// tools/make-tutorials.js); the others were found with tools/make-campaign.js and frozen here.
-// Tutorial steps: { say, dir?, mark? }. A step with `dir` waits for that swipe; one without
-// lets the player finish the level. `mark` highlights tiles: a list of [x, y] or one of
-// 'goal', 'glass', 'shapes', 'switches', 'bridges'.
+// A level with an `intro` is the first to use a mechanic: the game shows the note and highlights
+// the tiles ('goal', 'walls', 'glass', 'shapes', 'switches', 'bridges' or a list of [x, y]) without
+// limiting the player's moves. Levels were found with tools/make-campaign.js and frozen here.
+//
+// TUTORIAL is separate from the campaign: it plays on first launch and can be replayed from
+// Settings. Its steps are { say, dir?, mark? }: a step with `dir` waits for that swipe (other
+// swipes are ignored), a step without lets the player finish the stage.
 (function (root) {
   const LEVELS = [
     {
       world: 1,
       name: 'The Sketch',
-      tutorial: [
-        { dir: 'right', say: 'Swipe right → to roll. The small square tips over and becomes a horizontal bar.' },
-        { dir: 'right', say: 'Swipe → again: the bar rolls over and becomes a small square.' },
-        { dir: 'right', say: 'Every move changes the shape. Swipe → once more.' },
-        { dir: 'up', say: 'Up and down change the height. Swipe ↑: the bar becomes the big square.' },
-        { say: 'Keep going up and land exactly in the glowing goal, in its shape.', mark: 'goal' },
-      ],
+      intro: { say: 'Swipe to roll: ← → change the width, ↑ ↓ the height. Land in the glowing goal as the big square.', mark: 'goal' },
       map: [
         '####GG',
         '####GG',
@@ -31,31 +27,8 @@
     },
     {
       world: 1,
-      name: 'Bump',
-      tutorial: [
-        { dir: 'right', say: 'Raised blocks are walls. Swipe → to roll toward this one.', mark: [[3, 0]] },
-        { dir: 'right', say: 'The bar can\'t roll into the wall, so it bumps it and changes shape in place. Swipe → to bump!', mark: [[3, 0]] },
-      ],
-      map: [
-        'S#GX',
-      ],
-    },
-    {
-      world: 1,
-      name: 'Out of Step',
-      tutorial: [
-        { dir: 'right', say: 'The goal is right next to you. Try rolling onto it: swipe →.', mark: 'goal' },
-        { say: 'Rolled past it! Rolling keeps a rhythm, so you skip that spot. Bump the wall to get in step. Dashed outlines show where each swipe lands.', mark: [[0, 1]] },
-      ],
-      map: [
-        '###',
-        'X##',
-        'SG#',
-      ],
-    },
-    {
-      world: 1,
       name: 'Sidestep',
+      intro: { say: 'Rolling into a wall changes your shape in place. Use the walls to get in step with the goal.', mark: 'walls' },
       map: [
         'X##.',
         '.##.',
@@ -115,9 +88,7 @@
     {
       world: 2,
       name: 'Glass',
-      tutorial: [
-        { say: 'Glass holds the small square and the bars, but the big square is too heavy: it breaks through. Find a way around.', mark: 'glass' },
-      ],
+      intro: { say: 'Glass holds the small square and the bars, but the big square is too heavy: it breaks through.', mark: 'glass' },
       map: [
         'X###',
         '#!GG',
@@ -218,9 +189,7 @@
     {
       world: 3,
       name: 'Shape Tiles',
-      tutorial: [
-        { say: 'Colored tiles only hold the shape drawn on them. This pink one is for the big square only.', mark: 'shapes' },
-      ],
+      intro: { say: 'Colored tiles only hold the shape drawn on them. This pink one is for the big square only.', mark: 'shapes' },
       map: [
         '#G###',
         '#G###',
@@ -326,10 +295,7 @@
     {
       world: 4,
       name: 'Switch',
-      tutorial: [
-        { dir: 'up', say: 'Dashed tiles are bridges, closed for now. Swipe ↑ onto the switch.', mark: 'switches' },
-        { say: 'The bridge appeared! Each time you land on a switch, every bridge flips: open ones close, closed ones open.', mark: 'bridges' },
-      ],
+      intro: { say: 'Dashed tiles are bridges. Landing on a switch (ring) flips every bridge: closed ones open, open ones close.', mark: 'switches' },
       map: [
         'o#=#',
         '#GG#',
@@ -390,9 +356,7 @@
     {
       world: 4,
       name: 'Heavy Switch',
-      tutorial: [
-        { say: 'A heavy switch (thick ring) only clicks under the big square. Open the bridge to reach the goal.', mark: 'switches' },
-      ],
+      intro: { say: 'A heavy switch (thick ring) only clicks under the big square.', mark: 'switches' },
       map: [
         'X=GG',
         '####',
@@ -444,8 +408,51 @@
     },
   ];
 
+  const TUTORIAL = [
+    {
+      name: 'Roll',
+      steps: [
+        { dir: 'right', say: 'Swipe right → to roll. The small square tips over and becomes a horizontal bar.' },
+        { dir: 'right', say: 'Swipe → again: the bar rolls over and becomes a small square.' },
+        { dir: 'right', say: 'Every move changes the shape. Swipe → once more.' },
+        { dir: 'up', say: 'Up and down change the height. Swipe ↑: the bar becomes the big square.' },
+        { say: 'Keep going up and land exactly in the glowing goal, in its shape.', mark: 'goal' },
+      ],
+      map: [
+        '####GG',
+        '####GG',
+        '######',
+        '######',
+        '######',
+        'S#####',
+      ],
+    },
+    {
+      name: 'Bump',
+      steps: [
+        { dir: 'right', say: 'Raised blocks are walls. Swipe → to roll toward this one.', mark: [[3, 0]] },
+        { dir: 'right', say: 'The bar can\'t roll into the wall, so it bumps it and changes shape in place. Swipe → to bump!', mark: [[3, 0]] },
+      ],
+      map: [
+        'S#GX',
+      ],
+    },
+    {
+      name: 'Out of Step',
+      steps: [
+        { dir: 'right', say: 'The goal is right next to you. Try rolling onto it: swipe →.', mark: 'goal' },
+        { say: 'Rolled past it! Rolling keeps a rhythm, so you skip that spot. Bump the wall to get in step. Dashed outlines show where each swipe lands.', mark: [[0, 1]] },
+      ],
+      map: [
+        '###',
+        'X##',
+        'SG#',
+      ],
+    },
+  ];
+
   const WORLDS = ['Bump', 'Glass', 'Shapes', 'Circuits'];
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign(LEVELS, { WORLDS });
-  else { root.LEVELS = LEVELS; root.WORLDS = WORLDS; }
+  if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign(LEVELS, { WORLDS, TUTORIAL });
+  else { root.LEVELS = LEVELS; root.WORLDS = WORLDS; root.TUTORIAL = TUTORIAL; }
 })(typeof window !== "undefined" ? window : globalThis);
