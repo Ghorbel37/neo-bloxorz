@@ -1,7 +1,7 @@
 {
   "appId": "com.ghorbel37.neobloxorz",
   "appName": "Neo Bloxorz",
-  "webDir": "www",
+  "webDir": "dist/android",
   "backgroundColor": "#0b0d1a",
   "android": {
     "backgroundColor": "#0b0d1a"

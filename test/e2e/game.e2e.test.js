@@ -8,6 +8,8 @@ const LEVELS = require('../../www/js/levels.js');
 const Engine = require('../../www/js/engine.js');
 
 const URL = 'file://' + path.resolve(__dirname, '../../www/index.html');
+// The Android app's build (tools/build.js): same game, platforms/android/platform.js settings.
+const APP_URL = 'file://' + path.join(require('../../tools/build.js').build('android'), 'index.html');
 const KEY = { left: 'ArrowLeft', right: 'ArrowRight', up: 'ArrowUp', down: 'ArrowDown' };
 const SHOTS = process.env.SCREENSHOT_DIR;
 
@@ -21,7 +23,8 @@ test.after(async () => { if (browser) await browser.close(); });
 // Pages start as a returning player (first-launch tutorial already seen) unless `fresh`.
 // `cleared` marks that many campaign levels as solved so later ones are unlocked.
 // `ads` installs a fake AdMob backend that records calls in window.__adsLog.
-async function newPage({ fresh = false, cleared = 0, ads = false, brand = false } = {}) {
+// `app` loads the Android build instead of the web one.
+async function newPage({ fresh = false, cleared = 0, ads = false, brand = false, app = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -53,7 +56,7 @@ async function newPage({ fresh = false, cleared = 0, ads = false, brand = false 
       };
     });
   }
-  await page.goto(URL);
+  await page.goto(app ? APP_URL : URL);
   if (!brand) {
     // Skip the brand splash (it has its own test).
     await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
@@ -367,7 +370,7 @@ test('the brand splash shows at launch, then the game', async () => {
 });
 
 test('ads: banner on menus only, never during play', async () => {
-  const page = await newPage({ ads: true, cleared: 4 });
+  const page = await newPage({ ads: true, cleared: 4, app: true });
   await page.waitForFunction(() => window.__adsLog.includes('showBanner'));
   await shot(page, 'home-with-banner-space');
   await page.click('#modes .mode >> nth=0');
@@ -397,7 +400,7 @@ async function failPrecision(page) {
 }
 
 test('ads: a full-screen ad after losing, at most every other loss', async () => {
-  const page = await newPage({ ads: true, cleared: 1 });
+  const page = await newPage({ ads: true, cleared: 1, app: true });
   await failPrecision(page);
   await page.click('#modal-buttons button >> nth=0'); // Levels (1st loss: no ad)
   await page.click('[data-action=home]');
@@ -410,7 +413,7 @@ test('ads: a full-screen ad after losing, at most every other loss', async () =>
 });
 
 test('ads: watch an ad to continue a Descent run, once', async () => {
-  const page = await newPage({ ads: true });
+  const page = await newPage({ ads: true, app: true });
   await page.click('#modes .mode >> nth=1');
   await dismissIntro(page);
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
@@ -434,7 +437,7 @@ test('ads: watch an ad to continue a Descent run, once', async () => {
 });
 
 test('ads: watch an ad for more time in Rush, once', async () => {
-  const page = await newPage({ ads: true });
+  const page = await newPage({ ads: true, app: true });
   await page.click('#modes .mode >> nth=2');
   await dismissIntro(page);
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'rush');
@@ -453,7 +456,7 @@ test('ads: watch an ad for more time in Rush, once', async () => {
 });
 
 test('ads: out of hints in Descent, an ad gives one', async () => {
-  const page = await newPage({ ads: true });
+  const page = await newPage({ ads: true, app: true });
   await page.click('#modes .mode >> nth=1');
   await dismissIntro(page);
   await page.waitForFunction(() => window.__neo.session && window.__neo.session.kind === 'run');
@@ -468,7 +471,7 @@ test('ads: out of hints in Descent, an ad gives one', async () => {
 });
 
 test('ads: "Remove ads" turns off banners and full-screen ads', async () => {
-  const page = await newPage({ ads: true, cleared: 1 });
+  const page = await newPage({ ads: true, cleared: 1, app: true });
   await page.waitForFunction(() => window.__adsLog.includes('showBanner'));
   await page.click('#btn-settings');
   await page.click('text=Remove ads');
@@ -576,4 +579,24 @@ test('Test vibration shows errors when the native calls fail', async () => {
   const page = await hapticsPage(true);
   assert.match(await page.textContent('#modal-body'), /error: Vibrator unavailable/);
   await page.close();
+});
+
+test('builds: the app hides the on-screen arrows, the web version shows them', async () => {
+  const web = await newPage({ cleared: 1 });
+  const app = await newPage({ cleared: 1, app: true });
+  for (const [page, arrows] of [[web, true], [app, false]]) {
+    assert.equal(await page.evaluate(() => window.PLATFORM.id), arrows ? 'web' : 'android');
+    await page.click('#btn-settings');
+    assert.equal(await page.isVisible('text=On-screen arrows'), arrows, 'arrows setting');
+    assert.equal(await page.isVisible('text=Remove ads'), !arrows, 'ads options only in the app');
+    await page.click('#modal-buttons .primary');
+    await page.click('#modes .mode >> nth=0');
+    await page.click('.world-grid button >> nth=0');
+    assert.equal(await page.isVisible('#dpad'), arrows, 'arrows during play');
+    // Swiping and the keyboard still work everywhere.
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(() => window.__neo.play.moves === 1);
+    assert.deepEqual(page.errors, []);
+    await page.close();
+  }
 });

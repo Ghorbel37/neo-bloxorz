@@ -67,8 +67,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Sync web assets into the Android project
-        run: npx cap sync android
+      - name: Build the Android version and sync it into the Android project
+        run: npm run sync
 
       - name: Build debug APK
         working-directory: android
@@ -149,10 +149,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Assemble the site
+      - name: Build the web version
         run: |
+          node tools/build.js web
           mkdir -p site
-          cp -r www/* site/
+          cp -r dist/web/* site/
           cp docs/privacy.html site/privacy.html
 
       - uses: actions/upload-pages-artifact@v3

@@ -1,18 +1,11 @@
-## Neo Bloxorz 1.3.5: vibration that every phone plays
+## Neo Bloxorz 1.4.0: separate app and web builds
 
-Found the cause: Android treats any vibration shorter than a second with at most 3 parts as
-*touch feedback*, and phones with touch feedback turned off silently drop it. The single-pulse
-"impact" taps and plain vibrations used before were all touch feedback; the "level solved"
-pattern (4 parts) was the only one that played.
-
-Every vibration now uses a multi-part pattern that plays as a normal vibration:
-- wall bump: quick double tap
-- switch, level solved: success pattern
-- fall, lost heart, time up: longer warning pattern
-
-Settings › Test vibration plays these (1–3) plus, for comparison, a touch-feedback style tap (4),
-which phones with touch feedback off won't play.
+- The Android app and the web version are now built separately, each with its own settings.
+  - **App:** no on-screen arrows (you swipe). Undo and Hint sit side by side at the bottom.
+  - **Web:** keeps the arrows (handy on computers) and drops the ad options, since the web
+    version has no ads.
+- Fixed: changing any option in Settings restarted the ad system.
 
 ### Install
-Download `neo-bloxorz-v1.3.5-debug.apk` below and open it. It installs over 1.3.3/1.3.4 and keeps
-your progress.
+Download `neo-bloxorz-v1.4.0-debug.apk` below and open it. It installs over your current version
+and keeps your progress.

@@ -6,7 +6,7 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.3.5';
+  const APP_VERSION = '1.4.0';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
   const STORE_VERSION = 3;
@@ -794,7 +794,9 @@
     hint.disabled = !session.canHint() || play.frozen || !!guided;
     const skip = $('btn-skip');
     skip.hidden = !(session.canSkip && session.canSkip());
-    $('dpad').hidden = !store.settings.dpad;
+    $('dpad').hidden = !PLATFORM.arrows || !store.settings.dpad;
+    // Without arrows, Undo / Hint / Warp spread across the bottom instead of a corner stack.
+    document.querySelector('.pad').classList.toggle('no-dpad', $('dpad').hidden);
   }
 
   function tryMove(dir) {
@@ -1219,7 +1221,8 @@
   function openSettings() {
     const node = document.createElement('div');
     node.className = 'settings';
-    const items = [['preview', 'Show where each move lands'], ['sound', 'Sound'], ['vibration', 'Vibration'], ['dpad', 'On-screen arrows']];
+    const items = [['preview', 'Show where each move lands'], ['sound', 'Sound'], ['vibration', 'Vibration']];
+    if (PLATFORM.arrows) items.push(['dpad', 'On-screen arrows']);
     items.forEach(([key, label]) => {
       const l = document.createElement('label');
       l.innerHTML = `<span>${label}</span>`;
@@ -1229,7 +1232,6 @@
       input.addEventListener('change', () => {
         store.settings[key] = input.checked;
         Sound.setEnabled(store.settings.sound);
-  Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
         save();
       });
       l.appendChild(input);
@@ -1253,11 +1255,13 @@
     testVib.textContent = 'Test vibration';
     testVib.addEventListener('click', testVibration);
     node.appendChild(testVib);
-    const removeAds = document.createElement('button');
-    removeAds.textContent = store.adsRemoved ? 'Ads removed ✓' : 'Remove ads';
-    removeAds.disabled = store.adsRemoved;
-    removeAds.addEventListener('click', openRemoveAds);
-    node.appendChild(removeAds);
+    if (PLATFORM.ads) {
+      const removeAds = document.createElement('button');
+      removeAds.textContent = store.adsRemoved ? 'Ads removed ✓' : 'Remove ads';
+      removeAds.disabled = store.adsRemoved;
+      removeAds.addEventListener('click', openRemoveAds);
+      node.appendChild(removeAds);
+    }
     if (Ads.privacyOptionsRequired()) {
       const privacy = document.createElement('button');
       privacy.textContent = 'Privacy choices (ads)';
@@ -1359,7 +1363,7 @@
   }
 
   Sound.setEnabled(store.settings.sound);
-  Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
+  if (PLATFORM.ads) Ads.init({ adsRemoved: store.adsRemoved }).then(() => { if ($('game').hidden) Ads.showBanner(); });
   showHome();
   if (!store.seenIntro.howto) {
     // First launch: learn by playing, straight into the first tutorial level.

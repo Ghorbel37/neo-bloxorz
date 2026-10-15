@@ -79,6 +79,20 @@ Step-by-step guide: [docs/PLAY_STORE.md](docs/PLAY_STORE.md). Listing text and g
 - `tools/make-store-assets.js` — renders the Play Store screenshots, feature graphic and icon
 - `tools/make-icons.js` — renders `www/icon.svg` into the Android icons and splash screens
 
+## Builds: web and Android
+The game lives in `www/`. Each version gets its own settings file, `js/platform.js`:
+
+| | Web (GitHub Pages) | Android app (APK) |
+|---|---|---|
+| settings file | `www/js/platform.js` | `platforms/android/platform.js` |
+| on-screen arrows | yes (can be turned off) | no (swipe) |
+| ads, "Remove ads", privacy choices | no | yes |
+
+`npm run build` makes `dist/web` and `dist/android` (copies of `www/` with the right
+`platform.js`). Capacitor packages `dist/android`; GitHub Pages publishes `dist/web`. To add a
+difference between the two, add a flag to both `platform.js` files and read `PLATFORM.<flag>`
+in the game.
+
 ## Develop
 ```sh
 npm install
@@ -86,7 +100,7 @@ npm run serve          # play in the browser at http://localhost:8080
 npm test               # unit tests
 npm run test:e2e       # end-to-end tests in Chromium
 npm run check-levels   # after editing levels
-npx cap sync android   # copy www/ into the Android project
+npm run sync           # build dist/android and copy it into the Android project
 npx cap open android   # open in Android Studio
 ```
 
