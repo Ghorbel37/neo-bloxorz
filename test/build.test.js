@@ -11,14 +11,14 @@ const platformOf = (dir) => {
   return ctx.window.PLATFORM;
 };
 
-test('the web build: arrows, no ads', () => {
+test('the web build: arrows, no ads, no splash', () => {
   const p = platformOf(build('web'));
-  assert.deepEqual([p.id, p.arrows, p.ads], ['web', true, false]);
+  assert.deepEqual([p.id, p.arrows, p.ads, p.brandSplash], ['web', true, false, false]);
 });
 
-test('the Android build: no arrows, ads', () => {
+test('the Android build: no arrows, ads, splash', () => {
   const p = platformOf(build('android'));
-  assert.deepEqual([p.id, p.arrows, p.ads], ['android', false, true]);
+  assert.deepEqual([p.id, p.arrows, p.ads, p.brandSplash], ['android', false, true, true]);
 });
 
 test('both builds contain the whole game, only platform.js differs', () => {

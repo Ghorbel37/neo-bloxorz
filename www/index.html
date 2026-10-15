@@ -7,6 +7,7 @@
   <title>Neo Bloxorz</title>
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script src="js/platform.js"></script>
 </head>
 <body>
   <!-- Brand splash, shown at every launch (tap to skip) -->
@@ -22,6 +23,10 @@
       <div class="brand-sub">presents</div>
     </div>
   </div>
+  <script>
+    // Builds without the splash (the web version) remove it before it is ever shown.
+    if (!window.PLATFORM.brandSplash) document.getElementById('brand').remove();
+  </script>
   <!-- Home -->
   <main id="home" class="screen">
     <header class="title">
@@ -118,7 +123,6 @@
     </ul>
   </template>
 
-  <script src="js/platform.js"></script>
   <script src="js/engine.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/generator.js"></script>
@@ -129,6 +133,7 @@
   <script>
     (function () {
       var brand = document.getElementById('brand');
+      if (!brand) return;
       var hide = function () {
         if (brand.classList.contains('out')) return;
         brand.classList.add('out');

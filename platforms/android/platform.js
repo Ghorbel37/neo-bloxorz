@@ -4,4 +4,5 @@ window.PLATFORM = {
   // No on-screen arrows in the app: players swipe.
   arrows: false,
   ads: true,
+  brandSplash: true,
 };

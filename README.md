@@ -89,6 +89,7 @@ The game lives in `www/`. Each version gets its own settings file, `js/platform.
 | settings file | `www/js/platform.js` | `platforms/android/platform.js` |
 | on-screen arrows | yes (can be turned off) | no (swipe) |
 | ads, "Remove ads", privacy choices | no | yes |
+| "Ghorbel Games" splash at launch | no | yes |
 
 `npm run build` makes `dist/web` and `dist/android` (copies of `www/` with the right
 `platform.js`). Capacitor packages `dist/android`; GitHub Pages publishes `dist/web`. To add a

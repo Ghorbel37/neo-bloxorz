@@ -59,7 +59,7 @@ async function newPage({ fresh = false, cleared = 0, ads = false, brand = false,
   await page.goto(app ? APP_URL : URL);
   if (!brand) {
     // Skip the brand splash (it has its own test).
-    await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+    await page.evaluate(() => { const b = document.getElementById('brand'); if (b) { b.classList.add('out'); b.hidden = true; } });
   }
   page.errors = errors;
   return page;
@@ -415,8 +415,15 @@ test('progress saved by 1.1 is kept, mapped to the same levels by name', async (
   assert.deepEqual(page.errors, []);
 });
 
-test('the brand splash shows at launch, then the game', async () => {
+test('the web version has no brand splash', async () => {
   const page = await newPage({ brand: true });
+  assert.equal(await page.locator('#brand').count(), 0);
+  assert.ok(await page.isVisible('#home'));
+  assert.deepEqual(page.errors, []);
+});
+
+test('the app shows the brand splash at launch, then the game', async () => {
+  const page = await newPage({ brand: true, app: true });
   assert.ok(await page.isVisible('#brand'));
   assert.match(await page.textContent('#brand'), /GHORBEL\s*GAMES/);
   await shot(page, 'brand');
@@ -577,7 +584,7 @@ test('vibration uses native haptics in the app and respects the setting', async 
     }
   }, LEVELS.slice(0, 4).map((l) => l.name));
   await page.goto(URL);
-  await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+  await page.evaluate(() => { const b = document.getElementById('brand'); if (b) { b.classList.add('out'); b.hidden = true; } });
   // Level 2: walk the shortest route to a wall bump.
   await page.click('#modes .mode >> nth=0');
   await page.click('.world-grid button >> nth=1');
@@ -615,7 +622,7 @@ async function hapticsPage(fail) {
     localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true } }));
   }, fail);
   await page.goto(URL);
-  await page.evaluate(() => { const b = document.getElementById('brand'); b.classList.add('out'); b.hidden = true; });
+  await page.evaluate(() => { const b = document.getElementById('brand'); if (b) { b.classList.add('out'); b.hidden = true; } });
   await page.click('#btn-settings');
   await page.click('text=Test vibration');
   await page.waitForSelector('#modal-body:has-text("Which numbers did you feel")', { timeout: 10000 });

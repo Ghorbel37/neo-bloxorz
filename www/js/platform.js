@@ -6,4 +6,6 @@ window.PLATFORM = {
   arrows: true,
   // Google AdMob ads and the "Remove ads" / privacy options (AdMob only works in the app).
   ads: false,
+  // The "Ghorbel Games" splash at launch.
+  brandSplash: false,
 };
