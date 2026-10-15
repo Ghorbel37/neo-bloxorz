@@ -1,8 +1,11 @@
-## Neo Bloxorz 1.5.1
+## Neo Bloxorz 1.6.0
 
-- Removed the **Test vibration** button from Settings.
-- The web version no longer shows the Ghorbel Games splash at launch (the app still does).
+- **Glass is now Gates.** Instead of breaking under the big square and dropping it, a gate is
+  too narrow for it: the big square bumps against a gate like a wall, while the small square
+  and the bars pass through. World 2 is now called **Gates** and its levels have new names;
+  your stars carry over.
+- Removed the **Test vibration** button from Settings (1.5.1).
 
 ### Install
-Download `neo-bloxorz-v1.5.1-debug.apk` below and open it. It installs over your current version
+Download `neo-bloxorz-v1.6.0-debug.apk` below and open it. It installs over your current version
 and keeps your progress.

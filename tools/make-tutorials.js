@@ -27,7 +27,7 @@ function crossesBridge(map, path) {
 const SPECS = {
   rhythm: { w: [3, 5], h: [2, 3], tiles: { X: 0.2 }, goal: 'small-next-to-start',
     ok: (m, i) => i.bumps === 1 && i.par <= 6 && count(m, /X/g) <= 2 },
-  glass: { w: [4, 5], h: [3, 5], tiles: { X: 0.12, '!': 0.3 },
+  gates: { w: [4, 5], h: [3, 5], tiles: { X: 0.12, '!': 0.3 },
     ok: (m, i) => i.par <= 12 && i.bumps >= 1 && (() => { const p = without(m, /!/g); return p && p.par < i.par; })() },
   shapes: { w: [4, 5], h: [3, 5], tiles: { X: 0.12, a: 0.06, b: 0.06, c: 0.06, d: 0.06 },
     ok: (m, i) => i.par <= 12 && i.bumps >= 1 && count(m, /[abcd]/g) <= 3 && (() => { const p = without(m, /[abcd]/g); return p && p.par < i.par; })() },

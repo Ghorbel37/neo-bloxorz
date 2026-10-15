@@ -22,7 +22,7 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 
 ### Tiles
 - **Wall** `X` blocks rolling; bump it to change shape in place.
-- **Glass** `!` breaks under the big square.
+- **Gate** `!` lets the small square and the bars through; the big square bumps against it like a wall.
 - **Shape tiles** `a` `b` `c` `d` only hold the small square, horizontal bar, vertical bar or big square.
 - **Switch** `o` flips every bridge each time the block lands on it.
 - **Heavy switch** `O` only clicks under the big square.
@@ -31,7 +31,7 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 ## Modes
 - **Tutorial**: plays on first launch and can be replayed from Settings. Three guided stages
   teach rolling, bumping walls and the rhythm idea; you can skip it at any time.
-- **Campaign**: 34 puzzles in 4 worlds (Bump, Glass, Shapes, Circuits), with stars and hints.
+- **Campaign**: 34 puzzles in 4 worlds (Bump, Gates, Shapes, Circuits), with stars and hints.
   Levels never restrict your moves: the first level to use a new tile explains it in a note and
   highlights it.
 - **Descent**: a roguelike run through endless generated floors. 3 hearts, a move budget per floor,

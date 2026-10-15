@@ -14,9 +14,12 @@
 // stretches away from it). Bumps shift the rhythm, which is what the puzzles are about.
 // If even the bump would hit a wall, the block does not move.
 //
+// Gates are narrow: the small square and the bars pass through, but the big square is too
+// wide, so for the big square a gate is a wall (it bumps against it).
+//
 // Tiles:
 //   .  void            #  floor          X  wall           S  start      G  goal
-//   !  glass: breaks under the big square
+//   !  gate: open floor for every shape except the big square, which bumps against it
 //   a  b  c  d  shape tiles: only hold the small square (a), horizontal bar (b),
 //               vertical bar (c) or big square (d); any other shape falls through
 //   o  switch: toggles the bridges whenever the block lands on it
@@ -118,16 +121,20 @@
     return { x, y, w, h, open: s.open };
   }
 
+  // Walls stop every shape; gates stop only the big square.
   function hitsWall(level, s) {
-    return cellsOf(s).some(([cx, cy]) => tileAt(level, s.open, cx, cy) === 'X');
+    const big = isBig(s);
+    return cellsOf(s).some(([cx, cy]) => {
+      const t = tileAt(level, s.open, cx, cy);
+      return t === 'X' || (big && t === '!');
+    });
   }
 
-  // Cells under the block that can't hold it (void, glass under the big square, wrong shape tile).
+  // Cells under the block that can't hold it (void, wrong shape tile).
   function badCells(level, s, open) {
     return cellsOf(s).filter(([cx, cy]) => {
       const t = tileAt(level, open, cx, cy);
       if (t === '.') return true;
-      if (t === '!') return isBig(s);
       const shape = SHAPE_TILES[t];
       return shape ? shape[0] !== s.w || shape[1] !== s.h : false;
     });
@@ -135,7 +142,7 @@
 
   // Returns { state, outcome: 'ok' | 'fall' | 'win' | 'blocked', bumped, toggled, broke }.
   // 'blocked' means nothing happened (the block is wedged between walls).
-  // `broke` lists the tiles that gave way (glass or shape tiles) when the block fell.
+  // `broke` lists the tiles that gave way (shape tiles) when the block fell.
   function move(level, s, dir) {
     let n = roll(s, dir);
     let bumped = false;

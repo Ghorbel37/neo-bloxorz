@@ -6,15 +6,18 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.5.1';
+  const APP_VERSION = '1.6.0';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
-  const STORE_VERSION = 3;
+  const STORE_VERSION = 4;
   // 1.1 (store version 2) saved campaign progress by level number, in this order.
   const V2_LEVEL_NAMES = ['The Sketch', 'Bump', 'Wrong Foot', 'Sidestep', 'Off Beat', 'Backspin', 'Double Take', 'Rebound',
     'Ricochet', 'Thin Ice', 'Hairline', 'Cold Feet', 'Shards', 'Crackle', 'Frozen Lake', 'Splinter', 'Hall of Glass',
     'Fitting In', 'Square Peg', 'Shape Shift', 'Keyhole', 'Mold', 'Silhouette', 'Jigsaw', 'Morphology', 'Circuit',
     'Live Wire', 'Relay', 'Flip Flop', 'Heavyweight', 'Overload', 'Blackout'];
+  // 1.6 (store version 4) turned glass into gates and renamed world 2's levels (same maps).
+  const V3_RENAMED = { Glass: 'Gate', 'Thin Ice': 'Turnstile', Hairline: 'Narrows', 'Cold Feet': 'Doorway', Shards: 'Squeeze',
+    Crackle: 'Portcullis', 'Frozen Lake': 'Archway', Splinter: 'Checkpoint', 'Hall of Glass': 'Gatehouse' };
   const DEFAULTS = {
     version: STORE_VERSION,
     campaign: {}, // level name -> best moves
@@ -41,6 +44,14 @@
       for (const key of ['campaign', 'hinted', 'precision']) {
         const byName = {};
         for (const [i, v] of Object.entries(merged[key] || {})) if (V2_LEVEL_NAMES[i]) byName[V2_LEVEL_NAMES[i]] = v;
+        merged[key] = byName;
+      }
+      data.version = 3;
+    }
+    if (data.version === 3) {
+      for (const key of ['campaign', 'hinted', 'precision']) {
+        const byName = {};
+        for (const [name, v] of Object.entries(merged[key] || {})) byName[V3_RENAMED[name] || name] = v;
         merged[key] = byName;
       }
       merged.version = STORE_VERSION;
@@ -740,7 +751,7 @@
     if (Array.isArray(mark)) return mark;
     const level = play.level;
     if (mark === 'goal') return level.goal ? Engine.cellsOf(level.goal) : [];
-    const chars = { walls: 'X', glass: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
+    const chars = { walls: 'X', gates: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
     const out = [];
     level.tiles.forEach((row, y) => row.forEach((t, x) => { if (chars.includes(t)) out.push([x, y]); }));
     return out;
@@ -836,7 +847,12 @@
       return;
     }
     if (r.bumped) {
-      const hit = Engine.cellsOf(Engine.roll(from, dir)).filter(([x, y]) => tileAt(play.level, from.open, x, y) === 'X');
+      const rolled = Engine.roll(from, dir);
+      const big = Engine.isBig(rolled);
+      const hit = Engine.cellsOf(rolled).filter(([x, y]) => {
+        const t = tileAt(play.level, from.open, x, y);
+        return t === 'X' || (big && t === '!');
+      });
       play.flash = { cells: new Set(hit.map(([x, y]) => `${x},${y}`)), at: performance.now() };
       Sound.bump();
       vibrate('bump');
@@ -980,21 +996,6 @@
           ctx.setLineDash([]);
           continue;
         }
-        if (t === '!') {
-          ctx.fillStyle = '#9fe6ff22';
-          ctx.fill();
-          ctx.strokeStyle = '#9fe6ff99';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(x + w * 0.25, y + h * 0.2);
-          ctx.lineTo(x + w * 0.5, y + h * 0.5);
-          ctx.lineTo(x + w * 0.4, y + h * 0.8);
-          ctx.moveTo(x + w * 0.5, y + h * 0.5);
-          ctx.lineTo(x + w * 0.8, y + h * 0.4);
-          ctx.stroke();
-          continue;
-        }
         const shape = Engine.SHAPE_TILES[t];
         if (shape) {
           // Shape tiles: tinted with the shape's color and show the shape they accept.
@@ -1016,6 +1017,28 @@
         ctx.strokeStyle = isBridge ? '#8b7bff' : '#323b80';
         ctx.lineWidth = 1.5;
         ctx.stroke();
+        if (t === '!') {
+          // Gates: two posts with a narrow opening. Small shapes pass, the big square bumps.
+          const flash = play.flash && play.flash.cells.has(`${tx},${ty}`) ? Math.max(0, 1 - (now - play.flash.at) / 300) : 0;
+          const post = mixColor('#6b74c9', '#ffffff', flash);
+          const pw = w * 0.2;
+          const ph = h * 0.62;
+          const py = y + (h - ph) / 2;
+          ctx.strokeStyle = post + '99';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x + pw, py + ph * 0.2);
+          ctx.lineTo(x + w - pw, py + ph * 0.2);
+          ctx.stroke();
+          for (const px of [x + 2, x + w - pw - 2]) {
+            roundRect(px, py + 2, pw, ph, pw * 0.4);
+            ctx.fillStyle = '#0b0e24';
+            ctx.fill();
+            roundRect(px, py, pw, ph, pw * 0.4);
+            ctx.fillStyle = post;
+            ctx.fill();
+          }
+        }
         if (t === 'S') {
           ctx.strokeStyle = '#ffffff40';
           ctx.strokeRect(x + w * 0.3, y + h * 0.3, w * 0.4, h * 0.4);

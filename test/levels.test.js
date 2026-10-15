@@ -47,7 +47,7 @@ test('each world uses its mechanic', () => {
   // The first tutorial only teaches rolling, so it has no walls.
   const has = (w, re) => LEVELS.slice(1).filter((l) => l.world === w).every((l) => re.test(l.map.join('')));
   assert.ok(has(1, /X/), 'walls in world 1');
-  assert.ok(LEVELS.filter((l) => l.world === 2).every((l) => /!/.test(l.map.join(''))), 'glass in world 2');
+  assert.ok(LEVELS.filter((l) => l.world === 2).every((l) => /!/.test(l.map.join(''))), 'gates in world 2');
   assert.ok(has(3, /[abcd]/), 'shape tiles in world 3');
   assert.ok(has(4, /[oO]/), 'switches in world 4');
 });

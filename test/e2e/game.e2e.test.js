@@ -40,7 +40,7 @@ async function newPage({ fresh = false, cleared = 0, ads = false, brand = false,
       if (localStorage.getItem('neo-bloxorz-v1')) return;
       const campaign = {};
       for (const name of names) campaign[name] = 999;
-      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true }, campaign }));
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 4, seenIntro: { howto: true }, campaign }));
     }, LEVELS.slice(0, cleared).map((l) => l.name));
   }
   if (ads) {
@@ -176,7 +176,7 @@ test('Settings › Replay tutorial, and it can be skipped', async () => {
 
 test('levels that introduce a mechanic explain it without restricting moves', async () => {
   const page = await newPage({ cleared: LEVELS.length });
-  for (const name of ['Glass', 'Switch']) {
+  for (const name of ['Gate', 'Switch']) {
     const i = LEVELS.findIndex((l) => l.name === name);
     await page.evaluate(() => document.querySelector('[data-action=home]').click());
     await page.click('#modes .mode >> nth=0');
@@ -405,10 +405,21 @@ test('progress saved by 1.1 is kept, mapped to the same levels by name', async (
     version: 2, seenIntro: { howto: true }, campaign: { 0: 6, 2: 4, 9: 12 }, hinted: { 9: true }, rushBest: 7,
   } });
   const store = await page.evaluate(() => window.__neo.store());
-  assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, 'Thin Ice': 12 });
-  assert.deepEqual(store.hinted, { 'Thin Ice': true });
+  assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, Turnstile: 12 });
+  assert.deepEqual(store.hinted, { Turnstile: true });
   assert.equal(store.rushBest, 7);
-  assert.equal(store.version, 3);
+  assert.equal(store.version, 4);
+  assert.deepEqual(page.errors, []);
+});
+
+test('progress saved before gates replaced glass follows the renamed levels', async () => {
+  const page = await newPage({ saved: {
+    version: 3, seenIntro: { howto: true }, campaign: { Bump: 5, Glass: 8, 'Hall of Glass': 17 }, precision: { Shards: 16 },
+  } });
+  const store = await page.evaluate(() => window.__neo.store());
+  assert.deepEqual(store.campaign, { Bump: 5, Gate: 8, Gatehouse: 17 });
+  assert.deepEqual(store.precision, { Squeeze: 16 });
+  assert.equal(store.version, 4);
   assert.deepEqual(page.errors, []);
 });
 
@@ -577,7 +588,7 @@ test('vibration uses native haptics in the app and respects the setting', async 
     if (!localStorage.getItem('neo-bloxorz-v1')) {
       const campaign = {};
       for (const n of names) campaign[n] = 999;
-      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 3, seenIntro: { howto: true }, campaign }));
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 4, seenIntro: { howto: true }, campaign }));
     }
   }, LEVELS.slice(0, 4).map((l) => l.name));
   await page.goto(URL);

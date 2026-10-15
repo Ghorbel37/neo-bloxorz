@@ -132,14 +132,20 @@ test('win needs the exact goal shape and position', () => {
   assert.equal(Engine.move(l, s, 'up').outcome, 'ok');
 });
 
-test('glass breaks only under the big square', () => {
-  const l = lvl(['#!!', '#!!', 'S!!']);
+test('gates let small shapes through but stop the big square like a wall', () => {
+  const l = lvl(['##!#', '##!#', 'S#!#']);
   const s = Engine.initialState(l);
-  assert.equal(Engine.move(l, s, 'right').outcome, 'ok'); // horizontal bar on glass
-  const bar = Engine.move(l, s, 'right').state;
-  const r = Engine.move(l, bar, 'up'); // big square on glass
-  assert.equal(r.outcome, 'fall');
-  assert.equal(r.broke.length, 4);
+  const across = Engine.move(l, { ...s, x: 1 }, 'right'); // horizontal bar across the gate
+  assert.equal(across.outcome, 'ok');
+  assert.equal(across.bumped, false);
+  // A vertical bar rolling right would be a big square on the gate: it bumps instead,
+  // stretching away from the gate into a big square on the floor.
+  const r = Engine.move(l, { x: 1, y: 0, w: 1, h: 2, open: false }, 'right');
+  assert.equal(r.outcome, 'ok');
+  assert.equal(r.bumped, true);
+  assert.deepEqual([r.state.x, r.state.y, r.state.w, r.state.h], [0, 0, 2, 2]);
+  // At the edge of the board the bump stretches off it, so the block falls.
+  assert.equal(Engine.move(lvl(['#!#', '#!#', 'S!#']), { x: 0, y: 0, w: 1, h: 2, open: false }, 'right').outcome, 'fall');
 });
 
 test('shape tiles only hold their own shape', () => {

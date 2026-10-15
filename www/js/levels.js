@@ -1,10 +1,10 @@
 // Campaign levels. Legend (see engine.js):
-//   . void   # floor   X wall   S start   G goal   ! glass (breaks under the big square)
+//   . void   # floor   X wall   S start   G goal   ! gate (the big square bumps against it)
 //   a b c d  shape tiles (small / horizontal / vertical / big only)
 //   o switch   O heavy switch (big square only)   = bridge (closed)   + bridge (open)
 // The S cells give the starting shape, the G cells the shape needed to finish.
 // A level with an `intro` is the first to use a mechanic: the game shows the note and highlights
-// the tiles ('goal', 'walls', 'glass', 'shapes', 'switches', 'bridges' or a list of [x, y]) without
+// the tiles ('goal', 'walls', 'gates', 'shapes', 'switches', 'bridges' or a list of [x, y]) without
 // limiting the player's moves. Levels were found with tools/make-campaign.js and frozen here.
 //
 // TUTORIAL is separate from the campaign: it plays on first launch and can be replayed from
@@ -87,8 +87,8 @@
     },
     {
       world: 2,
-      name: 'Glass',
-      intro: { say: 'Glass holds the small square and the bars, but the big square is too heavy: it breaks through.', mark: 'glass' },
+      name: 'Gate',
+      intro: { say: 'Gates are narrow. The small square and the bars pass through, but the big square is too wide: it bumps against a gate like a wall.', mark: 'gates' },
       map: [
         'X###',
         '#!GG',
@@ -98,7 +98,7 @@
     },
     {
       world: 2,
-      name: 'Thin Ice',
+      name: 'Turnstile',
       map: [
         '.X...',
         '#!#..',
@@ -108,7 +108,7 @@
     },
     {
       world: 2,
-      name: 'Hairline',
+      name: 'Narrows',
       map: [
         'X!X##',
         '##.##',
@@ -119,7 +119,7 @@
     },
     {
       world: 2,
-      name: 'Cold Feet',
+      name: 'Doorway',
       map: [
         '#XX..',
         '#!#X.',
@@ -129,7 +129,7 @@
     },
     {
       world: 2,
-      name: 'Shards',
+      name: 'Squeeze',
       map: [
         '....X.',
         '...##X',
@@ -141,7 +141,7 @@
     },
     {
       world: 2,
-      name: 'Crackle',
+      name: 'Portcullis',
       map: [
         'X.....',
         '#.X!..',
@@ -152,7 +152,7 @@
     },
     {
       world: 2,
-      name: 'Frozen Lake',
+      name: 'Archway',
       map: [
         '.XX...',
         'X!#...',
@@ -163,7 +163,7 @@
     },
     {
       world: 2,
-      name: 'Splinter',
+      name: 'Checkpoint',
       map: [
         '..####',
         '##!##.',
@@ -177,7 +177,7 @@
     },
     {
       world: 2,
-      name: 'Hall of Glass',
+      name: 'Gatehouse',
       map: [
         '....##.',
         '..X####',
@@ -451,7 +451,7 @@
     },
   ];
 
-  const WORLDS = ['Bump', 'Glass', 'Shapes', 'Circuits'];
+  const WORLDS = ['Bump', 'Gates', 'Shapes', 'Circuits'];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign(LEVELS, { WORLDS, TUTORIAL });
   else { root.LEVELS = LEVELS; root.WORLDS = WORLDS; root.TUTORIAL = TUTORIAL; }
