@@ -1,6 +1,6 @@
 {
   "name": "neo-bloxorz",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "private": true,
   "description": "A 2D shape-shifting block puzzle for mobile.",
   "scripts": {

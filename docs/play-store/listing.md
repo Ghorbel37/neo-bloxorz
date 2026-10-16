@@ -16,12 +16,12 @@ Swipe sideways and it rolls over and changes width. Swipe up or down and it chan
 
 Easy to learn, surprisingly deep: a coached tutorial introduces each idea right when you need it.
 
-• 36 handcrafted puzzles in 4 worlds: Bump, Gates, Shapes and Circuits
-• Gates too narrow for the big square, colored tiles that hold only one shape, switches that flip bridges
+• 36 handcrafted puzzles in 4 worlds: Bump, Cracks, Shapes and Circuits
+• Cracked floor that breaks under the big square, colored tiles that hold only one shape, switches that flip bridges
 • Descent: a roguelike run through endless puzzle floors with hearts, move budgets and perks
 • Rush: beat the clock, every solve buys more time
 • Daily: a fresh puzzle every day, keep your streak alive
-• Precision: replay the campaign with a strict move limit
+• Precision: replay the campaign in exactly par moves, playing blind
 • Hints, undo, and dashed outlines that show where each swipe will land
 • Every generated puzzle is checked by a solver: always solvable
 • Plays offline, no account needed

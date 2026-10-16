@@ -6,18 +6,19 @@
   const shapeIndex = (w, h) => (w - 1) + (h - 1) * 2;
 
   // ---------- Storage ----------
-  const APP_VERSION = '1.6.0';
+  const APP_VERSION = '1.6.1';
   const PRIVACY_URL = 'https://ghorbel37.github.io/neo-bloxorz/privacy.html';
   const STORE_KEY = 'neo-bloxorz-v1';
-  const STORE_VERSION = 4;
+  const STORE_VERSION = 5;
   // 1.1 (store version 2) saved campaign progress by level number, in this order.
   const V2_LEVEL_NAMES = ['The Sketch', 'Bump', 'Wrong Foot', 'Sidestep', 'Off Beat', 'Backspin', 'Double Take', 'Rebound',
     'Ricochet', 'Thin Ice', 'Hairline', 'Cold Feet', 'Shards', 'Crackle', 'Frozen Lake', 'Splinter', 'Hall of Glass',
     'Fitting In', 'Square Peg', 'Shape Shift', 'Keyhole', 'Mold', 'Silhouette', 'Jigsaw', 'Morphology', 'Circuit',
     'Live Wire', 'Relay', 'Flip Flop', 'Heavyweight', 'Overload', 'Blackout'];
-  // 1.6 (store version 4) turned glass into gates and renamed world 2's levels (same maps).
-  const V3_RENAMED = { Glass: 'Gate', 'Thin Ice': 'Turnstile', Hairline: 'Narrows', 'Cold Feet': 'Doorway', Shards: 'Squeeze',
-    Crackle: 'Portcullis', 'Frozen Lake': 'Archway', Splinter: 'Checkpoint', 'Hall of Glass': 'Gatehouse' };
+  // Level renames: 1.6.1 (store version 5) calls glass "cracked floor" and renamed two levels;
+  // 1.6.0 (store version 4) had briefly turned glass into gates with gate-themed level names.
+  const RENAMED = { Glass: 'Cracks', 'Hall of Glass': 'Fault Line', Gate: 'Cracks', Turnstile: 'Thin Ice', Narrows: 'Hairline',
+    Doorway: 'Cold Feet', Squeeze: 'Shards', Portcullis: 'Crackle', Archway: 'Frozen Lake', Checkpoint: 'Splinter', Gatehouse: 'Fault Line' };
   const DEFAULTS = {
     version: STORE_VERSION,
     campaign: {}, // level name -> best moves
@@ -48,10 +49,10 @@
       }
       data.version = 3;
     }
-    if (data.version === 3) {
+    if (data.version === 3 || data.version === 4) {
       for (const key of ['campaign', 'hinted', 'precision']) {
         const byName = {};
-        for (const [name, v] of Object.entries(merged[key] || {})) byName[V3_RENAMED[name] || name] = v;
+        for (const [name, v] of Object.entries(merged[key] || {})) byName[RENAMED[name] || name] = v;
         merged[key] = byName;
       }
       merged.version = STORE_VERSION;
@@ -200,39 +201,49 @@
         action: () => openLevels('campaign'),
       },
       {
-        glyph: '∞', color: 'var(--shape3)', name: 'Descent',
+        key: 'run', glyph: '∞', color: 'var(--shape3)', name: 'Descent',
         desc: store.run ? `Run in progress: depth ${store.run.depth}, ${'♥'.repeat(store.run.hearts)}` : 'Roguelike. Endless floors, 3 hearts, perks.',
         meta: store.runBest ? `Best<br>depth ${store.runBest}` : 'New',
         action: startRunFlow,
       },
       {
-        glyph: '⏱', color: 'var(--shape1)', name: 'Rush',
+        key: 'rush', glyph: '⏱', color: 'var(--shape1)', name: 'Rush',
         desc: `${Modes.RUSH_START_SECONDS} seconds on the clock. Every solve buys time.`,
         meta: store.rushBest ? `Best<br>${store.rushBest} solved` : 'New',
         action: () => introThen('rush', 'Rush', `You have <b>${Modes.RUSH_START_SECONDS} seconds</b>. Each solved puzzle adds time (more for matching par). Falling costs 3 seconds. Puzzles get harder as you go.`, () => startSession(rushSession())),
       },
       {
-        glyph: '☀', color: 'var(--shape2)', name: 'Daily',
+        key: 'daily', glyph: '☀', color: 'var(--shape2)', name: 'Daily',
         desc: store.daily[today] != null ? `Solved today in ${store.daily[today]} moves.` : 'A fresh puzzle every day.',
         meta: streak ? `🔥 ${streak}` : '',
         action: () => startSession(dailySession()),
       },
       {
-        glyph: '◎', color: '#b48bff', name: 'Precision',
-        desc: 'Campaign levels with a strict move limit. No undo, no hints.',
+        key: 'precision', glyph: '◎', color: '#b48bff', name: 'Precision',
+        desc: 'Replay solved levels in exactly par moves. No undo, hints or previews.',
         meta: `${sealed}/${LEVELS.length}`,
-        action: () => {
-          if (!done) {
-            modal({ title: 'Precision', html: 'Solve a campaign level first to unlock it here.', buttons: [{ label: 'OK', primary: true }] });
-          } else openLevels('precision');
-        },
+        action: () => openLevels('precision'),
       },
     ];
+    // Extra modes open up as the player earns campaign stars. Anything already played stays open.
+    const stars = totalStars();
+    const played = { daily: Object.keys(store.daily).length > 0, rush: store.rushBest > 0, run: store.runBest > 0 || !!store.run, precision: sealed > 0 };
+    for (const c of cards) {
+      if (!c.key || played[c.key] || Modes.unlocked(c.key, stars) || window.__neoUnlockAll) continue;
+      const need = Modes.UNLOCK_STARS[c.key];
+      c.locked = true;
+      c.meta = `🔒<br>★ ${need}`;
+      c.action = () => modal({
+        title: c.name,
+        html: `Earn <b>★ ${need}</b> in the campaign to unlock ${c.name}. You have ★ ${stars}.`,
+        buttons: [{ label: 'Campaign', primary: true, action: () => openLevels('campaign') }, { label: 'OK' }],
+      });
+    }
     const nav = $('modes');
     nav.innerHTML = '';
     cards.forEach((c) => {
       const b = document.createElement('button');
-      b.className = 'mode';
+      b.className = c.locked ? 'mode locked' : 'mode';
       b.innerHTML = `<span class="glyph" style="background:${c.color}">${c.glyph}</span>
         <span class="info"><span class="name">${c.name}</span><br><span class="desc">${c.desc}</span></span>
         <span class="meta">${c.meta}</span>`;
@@ -276,7 +287,7 @@
         let label = '';
         if (precision) {
           if (store.precision[lk(i)] != null) { b.classList.add('sealed'); label = '◎'; }
-          else label = `≤${Modes.precisionLimit(campaignPars[i])}`;
+          else label = `${Modes.precisionLimit(campaignPars[i])}`;
         } else if (best != null) {
           b.classList.add('done');
           const s = Modes.starsFor(best, campaignPars[i]);
@@ -321,15 +332,16 @@
       kind: precision ? 'precision' : 'campaign',
       title: `${i + 1}. ${LEVELS[i].name}`,
       // A level that introduces a mechanic shows its note (and keeps it on the hint line).
-      hintText: precision ? `Solve in ${limit} moves or fewer.` : (LEVELS[i].intro && LEVELS[i].intro.say) || LEVELS[i].hint || '',
+      hintText: precision ? `Solve in exactly ${par} moves. No undo, hints or landing previews.` : (LEVELS[i].intro && LEVELS[i].intro.say) || LEVELS[i].hint || '',
       intro: precision ? null : LEVELS[i].intro || null,
       level: campaign[i],
       limit: precision ? () => limit : null,
       canUndo: () => !precision,
       canHint: () => !precision,
+      preview: !precision,
       useHint() { hinted = true; },
       stats() {
-        if (precision) return `Moves ${play.moves}/${limit} · Par ${par}`;
+        if (precision) return `Moves ${play.moves}/${limit}`;
         const best = store.campaign[lk(i)];
         return `Moves ${play.moves} · Par ${par}` + (best != null ? ` · Best ${best}` : '');
       },
@@ -340,7 +352,7 @@
         Sound.lose();
         modal({
           title: 'Out of moves',
-          html: `The limit here is <b>${limit}</b> moves. The best solution takes <b>${par}</b>.`,
+          html: `Precision asks for the shortest route: <b>${par}</b> moves.`,
           buttons: [{ label: 'Levels', action: afterLossAd(() => openLevels('precision')) }, { label: 'Retry', primary: true, action: afterLossAd(retry) }],
           onClose: afterLossAd(retry),
         });
@@ -350,7 +362,7 @@
         if (precision) {
           const prev = store.precision[lk(i)];
           if (prev == null || moves < prev) store.precision[lk(i)] = moves;
-          html = `<div class="big-number">◎</div>Sealed in <b>${moves}</b> moves (limit ${limit}, par ${par}).`;
+          html = `<div class="big-number">◎</div>Sealed in <b>${moves}</b> moves, the shortest route.`;
         } else {
           const prev = store.campaign[lk(i)];
           const firstClear = prev == null;
@@ -362,7 +374,7 @@
           html = `<div class="stars">${'★'.repeat(stars)}<span class="off">${'★'.repeat(3 - stars)}</span></div>
             <b>${moves}</b> moves (par ${par})${hinted ? '<br>Hints used: max 2 stars' : ''}
             ${prev != null && moves < prev ? '<br>New best!' : ''}`;
-          if (i === LEVELS.length - 1) html += '<br><br>You finished the campaign! Try Descent, Rush and Precision.';
+          if (i === LEVELS.length - 1) html += '<br><br>You finished the campaign! Try Precision: every level again, in exactly par moves.';
         }
         save();
         modal({
@@ -751,7 +763,7 @@
     if (Array.isArray(mark)) return mark;
     const level = play.level;
     if (mark === 'goal') return level.goal ? Engine.cellsOf(level.goal) : [];
-    const chars = { walls: 'X', gates: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
+    const chars = { walls: 'X', cracks: '!', shapes: 'abcd', switches: 'oO', bridges: '=+' }[mark] || '';
     const out = [];
     level.tiles.forEach((row, y) => row.forEach((t, x) => { if (chars.includes(t)) out.push([x, y]); }));
     return out;
@@ -841,19 +853,19 @@
     }
     const from = play.state;
     const r = move(play.level, from, dir);
+    const flashWalls = () => {
+      const hit = Engine.cellsOf(Engine.roll(from, dir)).filter(([x, y]) => tileAt(play.level, from.open, x, y) === 'X');
+      play.flash = { cells: new Set(hit.map(([x, y]) => `${x},${y}`)), at: performance.now() };
+    };
     if (r.outcome === 'blocked') {
+      // The wall stops the roll and there is no room to change shape: nothing moves.
+      flashWalls();
       play.shake = 0.4;
       Sound.blocked();
       return;
     }
     if (r.bumped) {
-      const rolled = Engine.roll(from, dir);
-      const big = Engine.isBig(rolled);
-      const hit = Engine.cellsOf(rolled).filter(([x, y]) => {
-        const t = tileAt(play.level, from.open, x, y);
-        return t === 'X' || (big && t === '!');
-      });
-      play.flash = { cells: new Set(hit.map(([x, y]) => `${x},${y}`)), at: performance.now() };
+      flashWalls();
       Sound.bump();
       vibrate('bump');
     }
@@ -1018,26 +1030,31 @@
         ctx.lineWidth = 1.5;
         ctx.stroke();
         if (t === '!') {
-          // Gates: two posts with a narrow opening. Small shapes pass, the big square bumps.
-          const flash = play.flash && play.flash.cells.has(`${tx},${ty}`) ? Math.max(0, 1 - (now - play.flash.at) / 300) : 0;
-          const post = mixColor('#6b74c9', '#ffffff', flash);
-          const pw = w * 0.2;
-          const ph = h * 0.62;
-          const py = y + (h - ph) / 2;
-          ctx.strokeStyle = post + '99';
-          ctx.lineWidth = 2;
+          // Cracked floor: crack lines, and a crossed-out big square (the one shape it can't hold).
+          ctx.strokeStyle = '#c9d1ff55';
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
-          ctx.moveTo(x + pw, py + ph * 0.2);
-          ctx.lineTo(x + w - pw, py + ph * 0.2);
+          ctx.moveTo(x + w * 0.08, y + h * 0.3);
+          ctx.lineTo(x + w * 0.22, y + h * 0.36);
+          ctx.lineTo(x + w * 0.3, y + h * 0.18);
+          ctx.moveTo(x + w * 0.92, y + h * 0.72);
+          ctx.lineTo(x + w * 0.78, y + h * 0.66);
+          ctx.lineTo(x + w * 0.74, y + h * 0.88);
+          ctx.moveTo(x + w * 0.62, y + h * 0.06);
+          ctx.lineTo(x + w * 0.68, y + h * 0.2);
           ctx.stroke();
-          for (const px of [x + 2, x + w - pw - 2]) {
-            roundRect(px, py + 2, pw, ph, pw * 0.4);
-            ctx.fillStyle = '#0b0e24';
-            ctx.fill();
-            roundRect(px, py, pw, ph, pw * 0.4);
-            ctx.fillStyle = post;
-            ctx.fill();
-          }
+          const big = SHAPE_COLORS[3];
+          const iw = w * 0.36;
+          const ix = x + (w - iw) / 2;
+          const iy = y + (h - iw) / 2;
+          roundRect(ix, iy, iw, iw, 2);
+          ctx.strokeStyle = big;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(ix - iw * 0.15, iy + iw * 1.15);
+          ctx.lineTo(ix + iw * 1.15, iy - iw * 0.15);
+          ctx.stroke();
         }
         if (t === 'S') {
           ctx.strokeStyle = '#ffffff40';
@@ -1253,7 +1270,7 @@
         }
       }
     }
-    if (store.settings.preview && !play.anim && !play.frozen) drawPreview();
+    if (store.settings.preview && !(session && session.preview === false) && !play.anim && !play.frozen) drawPreview();
     drawMarks(now);
     drawBlock(block, alpha, scale);
     const guide = coachStep() && coachStep().dir;

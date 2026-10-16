@@ -68,8 +68,8 @@ test('rolling alone keeps the rhythm: a small square only stops on every third c
 });
 
 test('bumping a wall changes shape in place', () => {
-  // Small square at x=2, wall at x=3: rolling right would hit the wall, so it stretches back.
-  const l = lvl(['S##X']);
+  // Small square at x=2, walls at x=3..4: rolling right would hit the wall, so it stretches back.
+  const l = lvl(['S##XX']);
   const small = at(2, 0, 1, 1);
   const r = Engine.move(l, small, 'right');
   assert.equal(r.outcome, 'ok');
@@ -82,16 +82,39 @@ test('bumping a wall changes shape in place', () => {
 });
 
 test('bumps work in every direction', () => {
-  const l = lvl(['##X##', '#####', 'X####', '#####', 'S#X##']);
-  // Left: rolling from x=1 would cover the wall at x=0, so the square stretches right instead.
-  assert.deepEqual(Engine.move(l, at(1, 2, 1, 1), 'left').state, at(1, 2, 2, 1));
-  // Up: the wall at (2,0) stops the roll, the square stretches downward in place.
-  assert.deepEqual(Engine.move(l, at(2, 2, 1, 1), 'up').state, at(2, 2, 1, 2));
-  // Down: the wall at (2,4) stops the roll, the square stretches upward.
-  assert.deepEqual(Engine.move(l, at(2, 3, 1, 1), 'down').state, at(2, 2, 1, 2));
+  // Each roll lands fully on walls, so the square changes shape in place instead.
+  const l = lvl(['XXXXX', '#####', '#####', 'XX###', 'S#XX#', '##XX#']);
+  // Left: the walls at x=0..1 stop the roll, the square stretches right.
+  assert.deepEqual(Engine.move(l, at(2, 3, 1, 1), 'left').state, at(2, 3, 2, 1));
+  // Right: the walls at x=2..3 stop the roll, the square stretches left.
+  assert.deepEqual(Engine.move(l, at(1, 4, 1, 1), 'right').state, at(0, 4, 2, 1));
+  // Up: the walls at y=0..1 stop the roll, the square stretches downward.
+  const v = lvl(['#X#', '#X#', '###', '###', '#X#', '#X#', 'S##']);
+  assert.deepEqual(Engine.move(v, at(1, 2, 1, 1), 'up').state, at(1, 2, 1, 2));
+  // Down: the walls at y=4..5 stop the roll, the square stretches upward.
+  assert.deepEqual(Engine.move(v, at(1, 3, 1, 1), 'down').state, at(1, 2, 1, 2));
   // A vertical bar against a wall shrinks into its half next to it.
-  assert.deepEqual(Engine.move(l, at(2, 2, 1, 2), 'down').state, at(2, 3, 1, 1));
-  assert.deepEqual(Engine.move(l, at(2, 1, 1, 2), 'up').state, at(2, 1, 1, 1));
+  assert.deepEqual(Engine.move(v, at(1, 2, 1, 2), 'down').state, at(1, 3, 1, 1));
+  assert.deepEqual(Engine.move(v, at(1, 2, 1, 2), 'up').state, at(1, 2, 1, 1));
+});
+
+test('a hole always loses, even next to a wall', () => {
+  // A horizontal bar rolling down onto a hole and a wall falls instead of bumping.
+  const l = lvl(['###', '.X#', '###', 'S##']);
+  const r = Engine.move(l, at(0, 0, 2, 1), 'down');
+  assert.equal(r.outcome, 'fall');
+  assert.equal(r.bumped, false);
+});
+
+test('a bump never stretches the block over a hole or off the board', () => {
+  // Pressing up into a wall from the bottom row would stretch the square down off the board.
+  const l = lvl(['#X', '#X', '##', 'S#']);
+  const r = Engine.move(l, at(1, 3, 1, 1), 'up');
+  assert.equal(r.outcome, 'blocked');
+  assert.deepEqual(r.state, at(1, 3, 1, 1));
+  // Same against a wall with a hole on the other side.
+  const h = lvl(['#S##', '.#XX']);
+  assert.equal(Engine.move(h, at(1, 1, 1, 1), 'right').outcome, 'blocked');
 });
 
 test('bumps shift the rhythm', () => {
@@ -108,10 +131,10 @@ test('a block wedged between walls does not move', () => {
   const r = Engine.move(l, at(1, 0, 2, 1), 'left');
   // Rolling left hits the wall at x=0, the bump shrinks to x=1 which is fine.
   assert.equal(r.outcome, 'ok');
-  const wedged = lvl(['X#X', 'XSX']);
+  const wedged = lvl(['XX#X', 'XXSX']);
   const s = Engine.initialState(wedged);
   const r2 = Engine.move(wedged, s, 'left');
-  // Rolling left from x=1 lands on the wall; bumping would stretch into x=2, also a wall.
+  // Rolling left from x=2 lands on the walls; bumping would stretch into x=3, also a wall.
   assert.equal(r2.outcome, 'blocked');
   assert.deepEqual(r2.state, s);
 });
@@ -132,20 +155,14 @@ test('win needs the exact goal shape and position', () => {
   assert.equal(Engine.move(l, s, 'up').outcome, 'ok');
 });
 
-test('gates let small shapes through but stop the big square like a wall', () => {
-  const l = lvl(['##!#', '##!#', 'S#!#']);
+test('cracked floor breaks only under the big square', () => {
+  const l = lvl(['#!!', '#!!', 'S!!']);
   const s = Engine.initialState(l);
-  const across = Engine.move(l, { ...s, x: 1 }, 'right'); // horizontal bar across the gate
-  assert.equal(across.outcome, 'ok');
-  assert.equal(across.bumped, false);
-  // A vertical bar rolling right would be a big square on the gate: it bumps instead,
-  // stretching away from the gate into a big square on the floor.
-  const r = Engine.move(l, { x: 1, y: 0, w: 1, h: 2, open: false }, 'right');
-  assert.equal(r.outcome, 'ok');
-  assert.equal(r.bumped, true);
-  assert.deepEqual([r.state.x, r.state.y, r.state.w, r.state.h], [0, 0, 2, 2]);
-  // At the edge of the board the bump stretches off it, so the block falls.
-  assert.equal(Engine.move(lvl(['#!#', '#!#', 'S!#']), { x: 0, y: 0, w: 1, h: 2, open: false }, 'right').outcome, 'fall');
+  assert.equal(Engine.move(l, s, 'right').outcome, 'ok'); // horizontal bar on cracked floor
+  const bar = Engine.move(l, s, 'right').state;
+  const r = Engine.move(l, bar, 'up'); // big square on cracked floor
+  assert.equal(r.outcome, 'fall');
+  assert.equal(r.broke.length, 4);
 });
 
 test('shape tiles only hold their own shape', () => {

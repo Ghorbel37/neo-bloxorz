@@ -12,14 +12,12 @@
 // Bumping: if the block would roll into a wall, it changes shape in place instead,
 // pressed against the wall (a bar shrinks into its half next to the wall, a small square
 // stretches away from it). Bumps shift the rhythm, which is what the puzzles are about.
-// If even the bump would hit a wall, the block does not move.
-//
-// Gates are narrow: the small square and the bars pass through, but the big square is too
-// wide, so for the big square a gate is a wall (it bumps against it).
+// If the bump would hit a wall or stretch out over a hole, the block does not move.
+// Rolling onto a hole always loses, even when a wall stands next to it.
 //
 // Tiles:
 //   .  void            #  floor          X  wall           S  start      G  goal
-//   !  gate: open floor for every shape except the big square, which bumps against it
+//   !  cracked floor: holds every shape but the big square, which is too heavy and breaks it
 //   a  b  c  d  shape tiles: only hold the small square (a), horizontal bar (b),
 //               vertical bar (c) or big square (d); any other shape falls through
 //   o  switch: toggles the bridges whenever the block lands on it
@@ -121,20 +119,16 @@
     return { x, y, w, h, open: s.open };
   }
 
-  // Walls stop every shape; gates stop only the big square.
   function hitsWall(level, s) {
-    const big = isBig(s);
-    return cellsOf(s).some(([cx, cy]) => {
-      const t = tileAt(level, s.open, cx, cy);
-      return t === 'X' || (big && t === '!');
-    });
+    return cellsOf(s).some(([cx, cy]) => tileAt(level, s.open, cx, cy) === 'X');
   }
 
-  // Cells under the block that can't hold it (void, wrong shape tile).
+  // Cells under the block that can't hold it (void, cracked floor under the big square, wrong shape tile).
   function badCells(level, s, open) {
     return cellsOf(s).filter(([cx, cy]) => {
       const t = tileAt(level, open, cx, cy);
       if (t === '.') return true;
+      if (t === '!') return isBig(s);
       const shape = SHAPE_TILES[t];
       return shape ? shape[0] !== s.w || shape[1] !== s.h : false;
     });
@@ -142,14 +136,21 @@
 
   // Returns { state, outcome: 'ok' | 'fall' | 'win' | 'blocked', bumped, toggled, broke }.
   // 'blocked' means nothing happened (the block is wedged between walls).
-  // `broke` lists the tiles that gave way (shape tiles) when the block fell.
+  // `broke` lists the tiles that gave way (cracked floor or shape tiles) when the block fell.
+  function overVoid(level, s) {
+    return cellsOf(s).some(([cx, cy]) => tileAt(level, s.open, cx, cy) === '.');
+  }
+
   function move(level, s, dir) {
     let n = roll(s, dir);
     let bumped = false;
+    // Rolling onto a hole always loses, even if a wall is there too.
+    if (overVoid(level, n)) return { state: n, outcome: 'fall', bumped, toggled: false, broke: [] };
     if (hitsWall(level, n)) {
       n = bump(s, dir);
       bumped = true;
-      if (hitsWall(level, n)) return { state: s, outcome: 'blocked', bumped, toggled: false, broke: [] };
+      // A bump never pushes the block into another wall or out over a hole: it stays put.
+      if (hitsWall(level, n) || overVoid(level, n)) return { state: s, outcome: 'blocked', bumped, toggled: false, broke: [] };
     }
     const bad = badCells(level, n, s.open);
     if (bad.length) {

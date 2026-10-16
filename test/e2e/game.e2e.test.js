@@ -24,13 +24,16 @@ test.after(async () => { if (browser) await browser.close(); });
 // `cleared` marks that many campaign levels as solved so later ones are unlocked.
 // `ads` installs a fake AdMob backend that records calls in window.__adsLog.
 // `app` loads the Android build instead of the web one.
+// `locked` keeps the star requirements for the extra modes (otherwise all modes are open).
 // `saved` is a stored game (as in localStorage) to start from. All saved data is put in place
 // before the page loads: writing storage and then reloading is unreliable for file:// pages.
-async function newPage({ fresh = false, cleared = 0, ads = false, brand = false, app = false, saved = null } = {}) {
+async function newPage({ fresh = false, cleared = 0, ads = false, brand = false, app = false, saved = null, locked = false } = {}) {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  // Modes unlock with campaign stars; most tests skip that unless `locked` is set.
+  if (!locked) await page.addInitScript(() => { window.__neoUnlockAll = true; });
   if (saved) {
     await page.addInitScript((data) => {
       if (!localStorage.getItem('neo-bloxorz-v1')) localStorage.setItem('neo-bloxorz-v1', JSON.stringify(data));
@@ -40,7 +43,7 @@ async function newPage({ fresh = false, cleared = 0, ads = false, brand = false,
       if (localStorage.getItem('neo-bloxorz-v1')) return;
       const campaign = {};
       for (const name of names) campaign[name] = 999;
-      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 4, seenIntro: { howto: true }, campaign }));
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 5, seenIntro: { howto: true }, campaign }));
     }, LEVELS.slice(0, cleared).map((l) => l.name));
   }
   if (ads) {
@@ -176,7 +179,7 @@ test('Settings › Replay tutorial, and it can be skipped', async () => {
 
 test('levels that introduce a mechanic explain it without restricting moves', async () => {
   const page = await newPage({ cleared: LEVELS.length });
-  for (const name of ['Gate', 'Switch']) {
+  for (const name of ['Cracks', 'Switch']) {
     const i = LEVELS.findIndex((l) => l.name === name);
     await page.evaluate(() => document.querySelector('[data-action=home]').click());
     await page.click('#modes .mode >> nth=0');
@@ -214,8 +217,8 @@ test('campaign: solve level 1 with swipes and get 3 stars', async () => {
     await page.mouse.up();
     await page.waitForFunction(() => !window.__neo.play.anim);
   };
-  for (let i = 0; i < 3; i++) await swipe(80, 0);
-  for (let i = 0; i < 3; i++) await swipe(0, -80);
+  // ↑ ↑ → ↑ → →: the tutorial's route (→ first) runs into the holes.
+  for (const [dx, dy] of [[0, -80], [0, -80], [80, 0], [0, -80], [80, 0], [80, 0]]) await swipe(dx, dy);
   await page.waitForSelector('#modal:not([hidden])');
   assert.equal(await page.textContent('#modal-title'), 'Solved!');
   assert.equal(await page.locator('#modal-body .stars').evaluate((e) => e.firstChild.textContent), '★★★');
@@ -317,12 +320,13 @@ test('daily: solve today\'s puzzle and start a streak', async () => {
   assert.deepEqual(page.errors, []);
 });
 
-test('precision: going over the move limit fails the level', async () => {
+test('precision: going over par fails the level', async () => {
   const page = await newPage({ cleared: 1 });
   await page.click('#modes .mode >> nth=4');
   await page.click('.world-grid button >> nth=0');
   assert.equal(await page.isVisible('#btn-undo'), false);
-  // Limit is 8: wander back and forth.
+  assert.equal(await page.evaluate(() => window.__neo.session.preview), false, 'no landing previews');
+  // The limit is par (6): wander back and forth.
   for (let i = 0; i < 4; i++) {
     await page.keyboard.press('ArrowRight');
     await page.waitForFunction(() => !window.__neo.play.anim);
@@ -333,6 +337,26 @@ test('precision: going over the move limit fails the level', async () => {
   assert.equal(await page.textContent('#modal-title'), 'Out of moves');
   await shot(page, 'precision-fail');
   assert.deepEqual(page.errors, []);
+});
+
+test('extra modes stay locked until the player has earned enough stars', async () => {
+  // Level 1 solved at par: 3 stars, enough for nothing but Campaign.
+  const page = await newPage({ locked: true, saved: { version: 5, seenIntro: { howto: true }, campaign: { 'The Sketch': 6 } } });
+  const locked = await page.$$eval('#modes .mode', (bs) => bs.map((b) => b.classList.contains('locked')));
+  assert.deepEqual(locked, [false, true, true, true, true]);
+  await page.click('#modes .mode >> nth=1');
+  assert.match(await page.textContent('#modal-body'), /Earn ★ 24 in the campaign to unlock Descent\. You have ★ 3/);
+  await page.click('#modal-buttons .primary');
+  assert.ok(await page.isVisible('#levels-screen'), 'the lock points to the campaign');
+  await page.close();
+  // With enough stars Daily and Rush open, and a mode already played stays open.
+  const names = LEVELS.slice(0, 5).map((l) => l.name);
+  const campaign = Object.fromEntries(names.map((n, i) => [n, [6, 5, 8, 8, 9][i]]));
+  const page2 = await newPage({ locked: true, saved: { version: 5, seenIntro: { howto: true }, campaign, runBest: 3 } });
+  const locked2 = await page2.$$eval('#modes .mode', (bs) => bs.map((b) => b.classList.contains('locked')));
+  // Campaign, Descent (played before), Rush and Daily (★ 15) open; Precision needs ★ 36.
+  assert.deepEqual(locked2, [false, false, false, false, true]);
+  assert.deepEqual(page2.errors, []);
 });
 
 test('hint shows the best next move', async () => {
@@ -405,22 +429,22 @@ test('progress saved by 1.1 is kept, mapped to the same levels by name', async (
     version: 2, seenIntro: { howto: true }, campaign: { 0: 6, 2: 4, 9: 12 }, hinted: { 9: true }, rushBest: 7,
   } });
   const store = await page.evaluate(() => window.__neo.store());
-  assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, Turnstile: 12 });
-  assert.deepEqual(store.hinted, { Turnstile: true });
+  assert.deepEqual(store.campaign, { 'The Sketch': 6, 'Wrong Foot': 4, 'Thin Ice': 12 });
+  assert.deepEqual(store.hinted, { 'Thin Ice': true });
   assert.equal(store.rushBest, 7);
-  assert.equal(store.version, 4);
+  assert.equal(store.version, 5);
   assert.deepEqual(page.errors, []);
 });
 
-test('progress saved before gates replaced glass follows the renamed levels', async () => {
-  const page = await newPage({ saved: {
-    version: 3, seenIntro: { howto: true }, campaign: { Bump: 5, Glass: 8, 'Hall of Glass': 17 }, precision: { Shards: 16 },
-  } });
-  const store = await page.evaluate(() => window.__neo.store());
-  assert.deepEqual(store.campaign, { Bump: 5, Gate: 8, Gatehouse: 17 });
-  assert.deepEqual(store.precision, { Squeeze: 16 });
-  assert.equal(store.version, 4);
-  assert.deepEqual(page.errors, []);
+test('progress from 1.5 (glass) and 1.6.0 (gates) follows the renamed levels', async () => {
+  for (const [saved, name] of [[{ version: 3, campaign: { Bump: 5, Glass: 8, 'Hall of Glass': 17 } }, 'Glass'], [{ version: 4, campaign: { Bump: 5, Gate: 8, Gatehouse: 17 } }, 'Gate']]) {
+    const page = await newPage({ saved: { ...saved, seenIntro: { howto: true } } });
+    const store = await page.evaluate(() => window.__neo.store());
+    assert.deepEqual(store.campaign, { Bump: 5, Cracks: 8, 'Fault Line': 17 }, name);
+    assert.equal(store.version, 5);
+    assert.deepEqual(page.errors, []);
+    await page.close();
+  }
 });
 
 test('the web version has no brand splash', async () => {
@@ -588,7 +612,7 @@ test('vibration uses native haptics in the app and respects the setting', async 
     if (!localStorage.getItem('neo-bloxorz-v1')) {
       const campaign = {};
       for (const n of names) campaign[n] = 999;
-      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 4, seenIntro: { howto: true }, campaign }));
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 5, seenIntro: { howto: true }, campaign }));
     }
   }, LEVELS.slice(0, 4).map((l) => l.name));
   await page.goto(URL);

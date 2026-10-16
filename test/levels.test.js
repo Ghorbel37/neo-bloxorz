@@ -13,7 +13,13 @@ test('campaign has 34 levels in 4 worlds', () => {
 LEVELS.forEach((def, i) => {
   test(`level ${i + 1} "${def.name}" starts bottom-left and is solvable`, () => {
     const level = Engine.parseLevel(def);
-    assert.deepEqual(level.start, { x: 0, y: level.height - 1, w: 1, h: 1 });
+    // The start is a small square on the bottom-left of the board: no floor further left or
+    // lower (walls may stand there).
+    assert.equal(level.start.w * level.start.h, 1);
+    level.tiles.forEach((row, y) => row.forEach((t, x) => {
+      if (t === '.' || t === 'X') return;
+      assert.ok(x >= level.start.x && y <= level.start.y, `floor at ${x},${y} is left of or below the start`);
+    }));
     assert.ok(level.goal, 'has a goal');
     const path = Engine.solve(level);
     assert.ok(path, 'solvable');

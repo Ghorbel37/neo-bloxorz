@@ -20,7 +20,7 @@ const ICON = fs.readFileSync(path.join(__dirname, '../www/icon.svg'), 'utf8');
     await page.addInitScript((names) => {
       const campaign = {};
       names.forEach((n, i) => { campaign[n] = [6, 2, 4, 5, 8, 9, 8, 13, 11, 8][i % 10]; });
-      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 4, seenIntro: { howto: true, run: true, rush: true }, campaign, runBest: 7, rushBest: 12, settings: { sound: false } }));
+      localStorage.setItem('neo-bloxorz-v1', JSON.stringify({ version: 5, seenIntro: { howto: true, run: true, rush: true }, campaign, runBest: 7, rushBest: 12, settings: { sound: false } }));
     }, LEVELS.slice(0, cleared).map((l) => l.name));
     await page.goto(URL);
     await page.evaluate(() => { const b = document.getElementById('brand'); if (b) { b.classList.add('out'); b.hidden = true; } });
@@ -38,7 +38,7 @@ const ICON = fs.readFileSync(path.join(__dirname, '../www/icon.svg'), 'utf8');
     ['1-home', 14, async () => {}],
     ['2-tutorial', 0, async (p) => { await p.evaluate(() => document.querySelector('[data-action=home]').click()); await openLevel(p, 'The Sketch'); }],
     ['3-bump', 3, async (p) => openLevel(p, 'Bump', ['ArrowRight'])],
-    ['4-gates', 20, async (p) => openLevel(p, 'Squeeze', ['ArrowUp', 'ArrowUp', 'ArrowRight'])],
+    ['4-cracks', 20, async (p) => openLevel(p, 'Shards', ['ArrowUp', 'ArrowUp', 'ArrowRight'])],
     ['5-levels', 20, async (p) => p.click('#modes .mode >> nth=0')],
     ['6-descent', 0, async (p) => { await p.click('#modes .mode >> nth=1'); await p.waitForTimeout(300); }],
     ['7-switch', 36, async (p) => openLevel(p, 'Relay', ['ArrowRight', 'ArrowUp'])],

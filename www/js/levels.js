@@ -1,10 +1,10 @@
 // Campaign levels. Legend (see engine.js):
-//   . void   # floor   X wall   S start   G goal   ! gate (the big square bumps against it)
+//   . void   # floor   X wall   S start   G goal   ! cracked floor (breaks under the big square)
 //   a b c d  shape tiles (small / horizontal / vertical / big only)
 //   o switch   O heavy switch (big square only)   = bridge (closed)   + bridge (open)
 // The S cells give the starting shape, the G cells the shape needed to finish.
 // A level with an `intro` is the first to use a mechanic: the game shows the note and highlights
-// the tiles ('goal', 'walls', 'gates', 'shapes', 'switches', 'bridges' or a list of [x, y]) without
+// the tiles ('goal', 'walls', 'cracks', 'shapes', 'switches', 'bridges' or a list of [x, y]) without
 // limiting the player's moves. Levels were found with tools/make-campaign.js and frozen here.
 //
 // TUTORIAL is separate from the campaign: it plays on first launch and can be replayed from
@@ -15,14 +15,14 @@
     {
       world: 1,
       name: 'The Sketch',
-      intro: { say: 'Swipe to roll: ← → change the width, ↑ ↓ the height. Land in the glowing goal as the big square.', mark: 'goal' },
+      intro: { say: 'Swipe to roll: ← → change the width, ↑ ↓ the height. Dark gaps are holes: don\'t roll into them. Land in the glowing goal as the big square.', mark: 'goal' },
       map: [
         '####GG',
         '####GG',
+        '###.##',
+        '#.####',
         '######',
-        '######',
-        '######',
-        'S#####',
+        'S##...',
       ],
     },
     {
@@ -31,7 +31,7 @@
       intro: { say: 'Rolling into a wall changes your shape in place. Use the walls to get in step with the goal.', mark: 'walls' },
       map: [
         'X##.',
-        '.##.',
+        'X##.',
         'S#GG',
       ],
     },
@@ -60,16 +60,17 @@
       name: 'Double Take',
       map: [
         'X...',
-        'GG..',
-        'GG#X',
-        'S##.',
+        '##X.',
+        '#G#X',
+        'SG##',
       ],
     },
     {
       world: 1,
       name: 'Rebound',
       map: [
-        '...XX',
+        '..XX.',
+        '..XXX',
         '..###',
         'X###.',
         'SG###',
@@ -79,16 +80,16 @@
       world: 1,
       name: 'Ricochet',
       map: [
-        '...X.X',
+        '...XXX',
         'X#####',
-        'GG.X##',
+        'GGXX##',
         'S#####',
       ],
     },
     {
       world: 2,
-      name: 'Gate',
-      intro: { say: 'Gates are narrow. The small square and the bars pass through, but the big square is too wide: it bumps against a gate like a wall.', mark: 'gates' },
+      name: 'Cracks',
+      intro: { say: 'Cracked floor holds the small square and the bars, but the big square is too heavy: it breaks through and falls.', mark: 'cracks' },
       map: [
         'X###',
         '#!GG',
@@ -98,40 +99,42 @@
     },
     {
       world: 2,
-      name: 'Turnstile',
+      name: 'Thin Ice',
       map: [
-        '.X...',
-        '#!#..',
-        '.GG#.',
-        'SGG#X',
+        '.X....',
+        '#!#...',
+        '.GG#X.',
+        'SGG#XX',
       ],
     },
     {
       world: 2,
-      name: 'Narrows',
+      name: 'Hairline',
       map: [
+        'X....',
         'X!X##',
         '##.##',
         'GG###',
         'GG!##',
         'SX.X.',
+        'XX...',
       ],
     },
     {
       world: 2,
-      name: 'Doorway',
+      name: 'Cold Feet',
       map: [
-        '#XX..',
-        '#!#X.',
-        'G###.',
-        'S###X',
+        '#XX...',
+        '#!#X..',
+        'G###X.',
+        'S###XX',
       ],
     },
     {
       world: 2,
-      name: 'Squeeze',
+      name: 'Shards',
       map: [
-        '....X.',
+        '....XX',
         '...##X',
         '##!X##',
         '##!X!#',
@@ -141,34 +144,37 @@
     },
     {
       world: 2,
-      name: 'Portcullis',
+      name: 'Crackle',
       map: [
+        'X.....',
         'X.....',
         '#.X!..',
         '##!!!#',
         '###X.#',
         'SX#GX#',
+        'XX....',
       ],
     },
     {
       world: 2,
-      name: 'Archway',
+      name: 'Frozen Lake',
       map: [
-        '.XX...',
-        'X!#...',
-        '##!##X',
-        'GG###.',
-        'S###..',
+        '..X....',
+        '.XX....',
+        'X!#....',
+        '##!##XX',
+        'GG###..',
+        'S###...',
       ],
     },
     {
       world: 2,
-      name: 'Checkpoint',
+      name: 'Splinter',
       map: [
         '..####',
         '##!##.',
         'X##XX.',
-        '#!!X..',
+        '#!!XX.',
         '##X...',
         '#G#...',
         '!.!X!.',
@@ -177,13 +183,14 @@
     },
     {
       world: 2,
-      name: 'Gatehouse',
+      name: 'Fault Line',
       map: [
         '....##.',
-        '..X####',
+        '.XX####',
         '.X!####',
         'X#!!#!#',
         'S##XG##',
+        '...X...',
       ],
     },
     {
@@ -191,15 +198,16 @@
       name: 'Shape Tiles',
       intro: { say: 'Colored tiles only hold the shape drawn on them. This pink one is for the big square only.', mark: 'shapes' },
       map: [
-        '#G###',
-        '#G###',
-        'Sd##X',
+        '#G###.',
+        '#G###.',
+        'Sd##XX',
       ],
     },
     {
       world: 3,
       name: 'Fitting In',
       map: [
+        '...X.',
         '...X.',
         'X..#.',
         '####.',
@@ -211,35 +219,37 @@
       world: 3,
       name: 'Square Peg',
       map: [
-        '##X..',
-        '##a#X',
-        '#####',
-        'GG###',
-        'SXb#X',
+        '##XX..',
+        '##a#X.',
+        '#####.',
+        'GG###.',
+        'SXb#XX',
       ],
     },
     {
       world: 3,
       name: 'Shape Shift',
       map: [
-        '.X...',
-        '!#..X',
-        '.####',
-        '.Gb##',
-        'SG##X',
+        '.X....',
+        '.X....',
+        '!#..X.',
+        '.####.',
+        '.Gb##.',
+        'SG##XX',
+        '....X.',
       ],
     },
     {
       world: 3,
       name: 'Keyhole',
       map: [
-        '####X',
-        '###..',
-        '####.',
-        '##...',
-        '##aX.',
-        '##G#X',
-        'SXG#.',
+        '####XX',
+        '###...',
+        '####..',
+        '##XX..',
+        '##aX..',
+        '##G#X.',
+        'SXG#..',
       ],
     },
     {
@@ -258,8 +268,8 @@
       world: 3,
       name: 'Silhouette',
       map: [
-        '.##X..',
-        'X##.X#',
+        'X##X..',
+        'X##XX#',
         '###!.#',
         '##cX!c',
         '######',
@@ -271,17 +281,19 @@
       world: 3,
       name: 'Jigsaw',
       map: [
-        '.X!.',
-        'X#db',
-        'X##X',
-        '##G.',
-        'S##.',
+        '..X..',
+        '..X!.',
+        'XX#db',
+        'XX##X',
+        '.##G.',
+        '.S##.',
       ],
     },
     {
       world: 3,
       name: 'Morphology',
       map: [
+        '..X...',
         '..X..a',
         '.!#!##',
         '..!##!',
@@ -306,11 +318,11 @@
       world: 4,
       name: 'Circuit',
       map: [
-        'X...X.',
-        '#..X#!',
-        '####oX',
-        'GG####',
-        'S#.=##',
+        'X...X..',
+        '#..X#!.',
+        '####oXX',
+        'GG####X',
+        'S#.=##.',
       ],
     },
     {
@@ -343,14 +355,14 @@
       world: 4,
       name: 'Flip Flop',
       map: [
-        '.#...',
-        '.#!..',
-        '.#...',
-        '##X..',
-        '##X..',
-        '#=#..',
-        '####X',
-        'SGo##',
+        '#####!',
+        '.X+###',
+        '###X.#',
+        '#.###X',
+        'o.#=XX',
+        '###o#.',
+        '.##X#X',
+        'S#GG!#',
       ],
     },
     {
@@ -368,14 +380,14 @@
       world: 4,
       name: 'Heavyweight',
       map: [
-        '#+#X.',
-        '#O##X',
-        '###..',
-        '####X',
-        '###..',
-        '##=..',
-        '!XGG.',
-        'S#GGX',
+        '#+#X..',
+        '#O##XX',
+        '###...',
+        '####X.',
+        '###...',
+        '##=...',
+        '!XGG..',
+        'S#GGX.',
       ],
     },
     {
@@ -395,13 +407,14 @@
       world: 4,
       name: 'Blackout',
       map: [
-        'X.O#X',
-        '####.',
+        'X....',
+        'XXO#X',
+        '####X',
         '###X.',
         '#+X..',
         '=!#..',
         'O##X.',
-        'G#...',
+        'G#X..',
         '##X..',
         'S#X..',
       ],
@@ -451,7 +464,7 @@
     },
   ];
 
-  const WORLDS = ['Bump', 'Gates', 'Shapes', 'Circuits'];
+  const WORLDS = ['Bump', 'Cracks', 'Shapes', 'Circuits'];
 
   if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign(LEVELS, { WORLDS, TUTORIAL });
   else { root.LEVELS = LEVELS; root.WORLDS = WORLDS; root.TUTORIAL = TUTORIAL; }

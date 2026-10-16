@@ -20,9 +20,12 @@ The block starts as a **small square** in the bottom-left corner:
 the wall. That shifts its rhythm. Land exactly in the glowing goal, in the shape its outline
 shows: working out which walls to bump, and in what order, is the puzzle.
 
+**Holes.** Rolling onto a hole (or off the board) always loses, even if a wall is there too.
+A bump never stretches the block out over a hole or off the board: the block just stays put.
+
 ### Tiles
 - **Wall** `X` blocks rolling; bump it to change shape in place.
-- **Gate** `!` lets the small square and the bars through; the big square bumps against it like a wall.
+- **Cracked floor** `!` holds the small square and the bars, but breaks under the big square.
 - **Shape tiles** `a` `b` `c` `d` only hold the small square, horizontal bar, vertical bar or big square.
 - **Switch** `o` flips every bridge each time the block lands on it.
 - **Heavy switch** `O` only clicks under the big square.
@@ -31,14 +34,16 @@ shows: working out which walls to bump, and in what order, is the puzzle.
 ## Modes
 - **Tutorial**: plays on first launch and can be replayed from Settings. Three guided stages
   teach rolling, bumping walls and the rhythm idea; you can skip it at any time.
-- **Campaign**: 34 puzzles in 4 worlds (Bump, Gates, Shapes, Circuits), with stars and hints.
+- **Campaign**: 34 puzzles in 4 worlds (Bump, Cracks, Shapes, Circuits), with stars and hints.
   Levels never restrict your moves: the first level to use a new tile explains it in a note and
   highlights it.
 - **Descent**: a roguelike run through endless generated floors. 3 hearts, a move budget per floor,
   and a perk to pick after each floor (Extra Heart, Rewind, Stamina, Ghost, Compass, Warp).
 - **Rush**: time attack. 90 seconds, each solve buys more time, puzzles get harder.
 - **Daily**: one generated puzzle per day (the same for everyone), with a streak counter.
-- **Precision**: campaign levels with a strict move limit, no undo and no hints.
+- **Precision**: replay solved levels in exactly par moves, with no undo, hints or landing previews.
+
+Descent, Rush, Daily and Precision unlock as you earn campaign stars (★ 24, 15, 6 and 36).
 
 Because every move toggles the shape, the board is a grid of slots that alternate thin and
 thick, and each slot only fits one shape.

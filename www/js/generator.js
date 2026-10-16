@@ -1,6 +1,6 @@
 // Procedural puzzle generator.
 //
-// A random compact board is built (holes, walls, gates, shape tiles, switches and bridges),
+// A random compact board is built (holes, walls, cracked floor, shape tiles, switches and bridges),
 // every reachable state is explored, and the goal is placed on a reachable spot. What makes
 // a level a puzzle rather than a path is how many wall bumps it takes to get into the
 // right rhythm for the goal (Engine.minBumps), so goals are chosen to need several bumps,
@@ -37,7 +37,7 @@
       h: Math.min(10, 6 + Math.floor(d / 2)),
       holes: Math.min(0.22, 0.12 + d * 0.01),
       walls: Math.min(0.16, 0.1 + d * 0.005),
-      gates: d >= 3 ? Math.min(0.12, 0.04 + d * 0.01) : 0,
+      cracks: d >= 3 ? Math.min(0.12, 0.04 + d * 0.01) : 0,
       shapes: d >= 5 ? Math.min(3, 1 + Math.floor((d - 5) / 4)) : 0,
       bridges: d >= 7 ? Math.min(3, 1 + Math.floor((d - 7) / 5)) : 0,
       heavy: d >= 10,
@@ -102,7 +102,7 @@
     for (let i = Math.round(W * H * o.holes); i > 0 && f.length; i--) { const [x, y] = pickFrom(f); g[y][x] = '.'; }
     f = plain();
     for (let i = Math.round(W * H * o.walls); i > 0 && f.length; i--) { const [x, y] = pickFrom(f); g[y][x] = 'X'; }
-    for (const [x, y] of plain()) if (rng() < o.gates) g[y][x] = '!';
+    for (const [x, y] of plain()) if (rng() < o.cracks) g[y][x] = '!';
     f = plain();
     for (let i = 0; i < o.shapes && f.length; i++) { const [x, y] = pickFrom(f); g[y][x] = 'abcd'[Math.floor(rng() * 4)]; }
     if (o.bridges) {
@@ -137,7 +137,7 @@
     for (const { state } of seen.values()) {
       for (const dir of Object.keys(Engine.DIRS)) {
         for (const [x, y] of Engine.cellsOf(Engine.roll(state, dir))) {
-          if (g[y] && (g[y][x] === 'X' || g[y][x] === '!')) usedWalls.add(`${x},${y}`);
+          if (g[y] && g[y][x] === 'X') usedWalls.add(`${x},${y}`);
         }
       }
     }
@@ -148,7 +148,7 @@
       const t = g[y][x];
       if (t === '.') continue;
       if (touched(x, y)) { if (t === '=' || t === '+') bridgeUsed = true; continue; }
-      if ((t === 'X' || t === '!') && usedWalls.has(`${x},${y}`)) continue;
+      if (t === 'X' && usedWalls.has(`${x},${y}`)) continue;
       if ((t === 'X' || t === '!' || 'abcd'.includes(t)) && nearPath(x, y)) continue;
       g[y][x] = '.';
     }

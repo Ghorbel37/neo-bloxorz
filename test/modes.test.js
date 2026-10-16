@@ -8,9 +8,9 @@ test('stars', () => {
   assert.equal(M.starsFor(16, 10), 1);
 });
 
-test('precision limit gives a small margin over par', () => {
-  assert.equal(M.precisionLimit(6), 8);
-  assert.equal(M.precisionLimit(38), 42);
+test('precision asks for exactly par', () => {
+  assert.equal(M.precisionLimit(6), 6);
+  assert.equal(M.precisionLimit(38), 38);
 });
 
 test('run: hearts, ghost and death', () => {
@@ -124,4 +124,14 @@ test('the app version shown in Settings matches package.json', () => {
   const pkg = require('../package.json');
   const game = fs.readFileSync(path.join(__dirname, '../www/js/game.js'), 'utf8');
   assert.match(game, new RegExp(`APP_VERSION = '${pkg.version.replace(/\./g, '\\.')}'`));
+});
+
+test('extra modes unlock with campaign stars, in order', () => {
+  const order = ['daily', 'rush', 'run', 'precision'];
+  for (let i = 1; i < order.length; i++) assert.ok(M.UNLOCK_STARS[order[i]] > M.UNLOCK_STARS[order[i - 1]]);
+  assert.equal(M.unlocked('run', 0), false);
+  assert.equal(M.unlocked('run', M.UNLOCK_STARS.run), true);
+  assert.equal(M.unlocked('campaign', 0), true);
+  // Everything opens well before the campaign's 3 stars per level are all earned.
+  assert.ok(M.UNLOCK_STARS.precision <= 34 * 3 / 2);
 });

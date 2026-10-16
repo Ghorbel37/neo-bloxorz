@@ -35,10 +35,10 @@ function mechanicMatters(world, map, s) {
 
 // [world, count, settings(i), bumps range(i), par range(i)]
 const PLAN = [
-  [1, 7, (i) => ({ w: 4 + Math.floor(i / 3), h: 4 + Math.floor(i / 2), holes: 0.08 + i * 0.015, walls: 0.12, gates: 0, shapes: 0, bridges: 0, heavy: false }), (i) => [1 + Math.floor(i / 2), 1 + Math.floor(i / 2)], (i) => [4 + i, 8 + i * 2]],
-  [2, 8, (i) => ({ w: 5 + Math.floor(i / 3), h: 6 + Math.floor(i / 3), holes: 0.12, walls: 0.12, gates: 0.18, shapes: 0, bridges: 0, heavy: false }), (i) => [2 + Math.floor(i / 2), 3 + Math.floor(i / 2)], (i) => [8 + i, 16 + i * 2]],
-  [3, 8, (i) => ({ w: 5 + Math.floor(i / 3), h: 6 + Math.floor(i / 3), holes: 0.12, walls: 0.12, gates: 0.06, shapes: 2 + Math.floor(i / 3), bridges: 0, heavy: false }), (i) => [2 + Math.floor(i / 2), 3 + Math.floor(i / 2)], (i) => [10 + i, 18 + i * 2]],
-  [4, 7, (i) => ({ w: 6 + Math.floor(i / 3), h: 7 + Math.floor(i / 3), holes: 0.16, walls: 0.12, gates: 0.06, shapes: i >= 4 ? 1 : 0, bridges: 1 + Math.floor(i / 3), heavy: i >= 4 }), (i) => [3 + Math.floor(i / 2), 4 + Math.floor(i / 2)], (i) => [12 + i, 22 + i * 2]],
+  [1, 7, (i) => ({ w: 4 + Math.floor(i / 3), h: 4 + Math.floor(i / 2), holes: 0.08 + i * 0.015, walls: 0.12, cracks: 0, shapes: 0, bridges: 0, heavy: false }), (i) => [1 + Math.floor(i / 2), 1 + Math.floor(i / 2)], (i) => [4 + i, 8 + i * 2]],
+  [2, 8, (i) => ({ w: 5 + Math.floor(i / 3), h: 6 + Math.floor(i / 3), holes: 0.12, walls: 0.12, cracks: 0.18, shapes: 0, bridges: 0, heavy: false }), (i) => [2 + Math.floor(i / 2), 3 + Math.floor(i / 2)], (i) => [8 + i, 16 + i * 2]],
+  [3, 8, (i) => ({ w: 5 + Math.floor(i / 3), h: 6 + Math.floor(i / 3), holes: 0.12, walls: 0.12, cracks: 0.06, shapes: 2 + Math.floor(i / 3), bridges: 0, heavy: false }), (i) => [2 + Math.floor(i / 2), 3 + Math.floor(i / 2)], (i) => [10 + i, 18 + i * 2]],
+  [4, 7, (i) => ({ w: 6 + Math.floor(i / 3), h: 7 + Math.floor(i / 3), holes: 0.16, walls: 0.12, cracks: 0.06, shapes: i >= 4 ? 1 : 0, bridges: 1 + Math.floor(i / 3), heavy: i >= 4 }), (i) => [3 + Math.floor(i / 2), 4 + Math.floor(i / 2)], (i) => [12 + i, 22 + i * 2]],
 ];
 
 const out = [];

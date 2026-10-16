@@ -9,9 +9,17 @@
     return 1;
   }
 
-  // ---------- Precision: campaign levels with a strict move limit ----------
+  // ---------- Precision: replay campaign levels in exactly par moves, playing blind ----------
+  // (no undo, no hints and no landing previews). Three stars allow undo and previews, so
+  // this asks for more: the whole shortest route, worked out in your head.
   function precisionLimit(par) {
-    return par + Math.max(2, Math.ceil(par * 0.1));
+    return par;
+  }
+
+  // ---------- Unlocks: the extra modes open up as the player earns campaign stars ----------
+  const UNLOCK_STARS = { daily: 6, rush: 15, run: 24, precision: 36 };
+  function unlocked(mode, stars) {
+    return stars >= (UNLOCK_STARS[mode] || 0);
   }
 
   // ---------- Descent: roguelike run ----------
@@ -144,7 +152,7 @@
   }
 
   const api = {
-    starsFor, precisionLimit,
+    starsFor, precisionLimit, UNLOCK_STARS, unlocked,
     PERKS, MAX_HEARTS, createRun, runFloor, runFloorSeed, runBudget, runFail, runClear, perkChoices, applyPerk, runSkip, canRevive, runRevive,
     RUSH_START_SECONDS, RUSH_EXTRA_SECONDS, rushBonus, rushDepthFor, rushFloor,
     dateKey, dailyFloor, dailyStreak,

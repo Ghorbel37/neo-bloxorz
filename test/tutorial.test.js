@@ -4,7 +4,7 @@ const Engine = require('../www/js/engine.js');
 const LEVELS = require('../www/js/levels.js');
 
 const { TUTORIAL } = LEVELS;
-const MARKS = ['goal', 'walls', 'gates', 'shapes', 'switches', 'bridges'];
+const MARKS = ['goal', 'walls', 'cracks', 'shapes', 'switches', 'bridges'];
 
 function checkMark(level, mark) {
   if (!mark) return;
@@ -57,7 +57,7 @@ test('campaign levels never restrict moves: no guided steps, only notes', () => 
 test('the first campaign level using each mechanic explains it', () => {
   const cases = [
     [/X/, 'walls'],
-    [/!/, 'gates'],
+    [/!/, 'cracked floor'],
     [/[abcd]/, 'shape tiles'],
     [/[o=+]/, 'switches'],
     [/O/, 'heavy switches'],
